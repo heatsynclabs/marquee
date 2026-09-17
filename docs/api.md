@@ -153,6 +153,7 @@ skipped, which is how the real `"open": true` is told apart from the
 | POST | `/api/anim?name=X&fps=N` | Start a new stored animation |
 | POST | `/api/anim/frame?name=X` | Append one frame, body in base64 or hex |
 | DELETE | `/api/anim?name=X` | Delete one |
+| POST | `/api/wifi` | Setup portal form: `ssid`, `pass`, `host`. Saves and restarts. |
 | POST | `/api/reboot` | Restart |
 
 Query parameters mirror the JSON fields, so a browser address bar works:
