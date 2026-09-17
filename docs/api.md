@@ -1,43 +1,141 @@
-# API
+# API reference
 
 Everything the panel does is driven by one JSON object. The same object works
-over HTTP, WebSocket, UDP and the CLASP relay.
+over HTTP, WebSocket, UDP and a CLASP relay, so anything you can do from a
+browser you can also do from a script, a shell, or the other side of the
+internet.
+
+- [Command fields](#command-fields)
+- [Colors](#colors)
+- [Animations](#animations)
+- [What plays when: the queue and the idle rotation](#what-plays-when)
+- [Status polling](#status-polling)
+- [HTTP](#http)
+- [WebSocket](#websocket)
+- [UDP](#udp)
+- [CLASP relay](#clasp-relay)
+- [Settings](#settings)
+- [Stored animation format](#stored-animation-format)
 
 ## Command fields
 
 | Field | Type | Meaning |
 |-------|------|---------|
-| `text` (or `say`) | string | Message to display. Up to 127 characters. |
+| `text` (or `say`) | string | Message to display, up to 127 characters. |
 | `anim` | string | Built-in effect name. |
 | `play` | string | Stored animation name. |
-| `color` | string | `red`, `#ff0044`, `#f04`, or `rainbow`. |
-| `speed` | number | Scroll speed in pixels per second. Default 45. |
+| `color` | string or number | See [Colors](#colors). |
+| `rainbow` | bool | Color the text by column instead of using `color`. |
+| `speed` | number | Scroll speed in pixels per second. Default 20, which reads comfortably; 40 is brisk. |
 | `repeat` | number | How many times to play. `-1` repeats forever. Default 1. |
 | `scroll` | bool | `false` centers the text instead of scrolling. Default true. |
-| `hold` | number | Milliseconds to hold before moving on. Effects default to forever. |
+| `hold` | number | Milliseconds to hold before moving on. |
 | `fps` | number | Override a stored animation's frame rate. |
 | `now` | bool | Drop the queue and play immediately. Default false, which queues. |
-| `clear` | bool | Empty the queue and return to idle. |
+| `clear` | bool | Empty the queue and return to the idle rotation. |
 | `skip` | bool | Move on to the next queued item. |
 | `brightness` | number | 0-255. |
 | `power_ma` | number | Supply budget in milliamps. `0` disables the limiter. |
-| `idle` | string | Effect to show when the queue is empty. |
+| `idle` | string, object or array | Replace the idle rotation. See [What plays when](#what-plays-when). |
+| `rotate` | object | Replace the whole rotation document, the same body `POST /api/rotate` takes. |
+| `rotate_ms` | number | How long each idle entry stays up. |
 | `save` | bool | Write settings to flash immediately instead of a second later. |
 | `queue` | array | A list of command objects, applied in order. |
 
 A command with no `text`, `anim` or `play` only changes settings.
 
-Built-in effects: `off`, `solid`, `rainbow`, `plasma`, `fire`, `rain`,
-`sparkle`, `comet`, `chase`, `breathe`, `confetti`, `clock`.
-
-### Examples
-
 ```json
 {"text": "HELLO", "color": "rainbow", "repeat": 3}
+{"anim": "fire"}
 {"anim": "fire", "hold": 10000}
 {"queue": [{"text": "one"}, {"text": "two", "color": "#00ff88"}]}
-{"brightness": 120, "idle": "plasma"}
+{"brightness": 120, "idle": ["clock", {"text": "HEATSYNC LABS"}]}
 ```
+
+## Colors
+
+`color` accepts a name, a hex string, a packed number, or `rainbow`:
+
+    "red"  "#ff0044"  "#f04"  "0xff0044"  16711748  "rainbow"
+
+Names: `black`/`off`, `white`, `red`, `green`, `blue`, `yellow`, `orange`,
+`cyan`, `magenta`, `pink`, `purple`, `lime`, `amber`, `teal`.
+
+Colors are gamma corrected, then scaled by `brightness`, then scaled again if
+the frame would draw more than `power_ma`.
+
+## Animations
+
+Built in: `off`, `solid`, `rainbow`, `plasma`, `fire`, `rain`, `sparkle`,
+`comet`, `chase`, `breathe`, `confetti`, `clock`.
+
+`solid`, `sparkle`, `comet`, `chase` and `breathe` use `color`. `clock` reads
+the time over NTP and shows `HH:MM`, which fills the panel exactly.
+
+Your own animations are uploaded frame by frame, stored in the panel's
+filesystem, and played by name with `play`.
+
+## What plays when
+
+There are three layers:
+
+1. **Realtime.** A UDP packet or a binary WebSocket frame takes the panel over
+   for a couple of seconds. Nothing else draws while that is happening.
+2. **The queue.** Up to 8 items, played in order. This is where messages go.
+3. **The idle rotation.** What shows when the queue is empty.
+
+The rotation is a list of up to 6 items that take turns, each for `ms`
+milliseconds or until it finishes naturally, whichever comes first. A message
+always interrupts the rotation, and the rotation resumes when the queue drains.
+
+    {"idle": "clock"}                       one effect
+    {"idle": {"text": "HEATSYNC LABS"}}     one message, on repeat
+    {"idle": ["clock", "plasma"]}           two effects, taking turns
+    {"idle": [{"anim": "clock"},
+              {"text": "HEATSYNC LABS", "color": "#ff9f43"},
+              {"anim": "plasma"}]}
+
+`{"anim": "fire"}` with no `hold` is shorthand for a one-entry rotation, so
+sending an effect never blocks messages behind it. With a `hold` it becomes an
+ordinary timed queue entry instead.
+
+The rotation is saved to `/rotate.json` and survives reboots.
+
+## Status polling
+
+The panel can watch a JSON endpoint for one boolean and mix an extra entry into
+the rotation while it is true. Out of the box it watches whether HeatSync Labs
+is open, using the same SpaceAPI document the lab's own website reads.
+
+    GET https://members.heatsynclabs.org/space_api.json  ->  {... "open": true}
+
+While `open` is true, the `open` item appears every `status_every` turns of the
+rotation, so it keeps coming back around between everything else:
+
+    clock -> LAB OPEN -> HEATSYNC LABS -> LAB OPEN -> plasma -> LAB OPEN -> ...
+
+While it is false, the rotation runs normally and nothing extra is shown.
+
+Point it at anything that returns a JSON boolean:
+
+    curl -d '{"status_url":"https://example.com/thing.json","status_key":"ready"}' \
+         http://marquee.local/api/config
+
+The poll takes about 1.5 seconds and runs only while the panel is idle, so it
+never interrupts a message; the idle frame simply holds while it happens.
+Nested keys are matched by name anywhere in the document, and string values are
+skipped, which is how the real `"open": true` is told apart from the
+`"icon": {"open": "...png"}` field in the same file.
+
+| Setting | Default | Meaning |
+|---------|---------|---------|
+| `status_enabled` | true | Poll at all |
+| `status_url` | the SpaceAPI URL above | Any http or https URL |
+| `status_key` | `open` | JSON key to watch |
+| `status_poll_s` | 300 | Seconds between polls |
+| `status_every` | 2 | Show the open item every Nth idle turn |
+
+`POST /api/status/poll` forces a poll right away.
 
 ## HTTP
 
@@ -45,9 +143,12 @@ Built-in effects: `off`, `solid`, `rainbow`, `plasma`, `fire`, `rain`,
 |--------|------|---------|
 | GET | `/` | Web UI |
 | GET/POST | `/api/cmd` | Run a command. POST a JSON body, or pass query parameters. |
-| GET | `/api/state` | Status, effect list, stored animations |
+| GET | `/api/state` | Status, current item, rotation, effects, stored animations |
 | GET | `/api/config` | Current settings |
 | POST | `/api/config` | Change settings. Add `"reboot": true` to restart. |
+| GET | `/api/rotate` | The idle rotation document |
+| POST | `/api/rotate` | Replace it: `{"ms":15000,"items":[...],"open":{...}}` |
+| POST | `/api/status/poll` | Poll the status endpoint now |
 | GET | `/api/anim` | List stored animations |
 | POST | `/api/anim?name=X&fps=N` | Start a new stored animation |
 | POST | `/api/anim/frame?name=X` | Append one frame, body in base64 or hex |
@@ -58,12 +159,16 @@ Query parameters mirror the JSON fields, so a browser address bar works:
 
     http://marquee.local/api/cmd?say=hello&color=%23ff0044&repeat=2
 
+`POST /api/rotate` with `"open": false` turns the status entry off.
+
 ## WebSocket
 
-Port 81. Send the same JSON as a text message.
+Port 81. Send the same JSON as a text message; errors come back as
+`{"ok":false,"error":"..."}`.
 
-A binary message of exactly 720 bytes (30 x 8 x RGB) is drawn straight to the
-panel and holds it for two seconds. Keep sending frames for live output.
+A binary message of exactly 720 bytes (30 x 8 x RGB, row major from the top
+left) is drawn straight to the panel and holds it for two seconds. Keep sending
+frames for live output.
 
 ```js
 const ws = new WebSocket('ws://marquee.local:81/');
@@ -86,13 +191,52 @@ The second byte is how many seconds the panel stays under external control
 after the last packet. A packet starting with `{` is treated as a JSON command
 instead.
 
-```sh
-printf '{"say":"from udp"}' | nc -u -w0 marquee.local 21324
-```
+    printf '{"say":"from udp"}' | nc -u -w0 marquee.local 21324
 
-## Stored animations
+## CLASP relay
 
-Each is a file in the panel's filesystem:
+Turn it on with `{"clasp_enabled":true}` in `/api/config`. The panel subscribes
+to `/marquee/<device>/**` on the relay, where `<device>` is `clasp_device` in
+the settings. See [clasp.md](clasp.md) for setup and trade-offs.
+
+| Address | Type | Effect |
+|---------|------|--------|
+| `/marquee/<device>/cmd` | string | Any command object from this page, as JSON |
+| `/marquee/<device>/say` | string | Queue a message |
+| `/marquee/<device>/text` | string | Same as `say` |
+| `/marquee/<device>/anim` | string | Run an effect immediately |
+| `/marquee/<device>/brightness` | int, float or bool | Set brightness |
+| `/marquee/<device>/status` | string | Published by the panel: `online`, every 30s |
+
+`cmd` is the general one, and reaches every field in the table at the top:
+
+    /marquee/kitchen/cmd  =  {"text":"dinner","color":"amber","repeat":2}
+    /marquee/kitchen/cmd  =  {"idle":["clock","fire"],"rotate_ms":20000}
+    /marquee/kitchen/cmd  =  {"rotate":{"open":{"text":"OPEN","color":"lime"}}}
+
+Values arrive as CLASP parameters (`SET`). Commands must fit in a single frame
+of about 1 KB.
+
+## Settings
+
+`GET /api/config` returns them; `POST /api/config` changes any subset.
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `host` | `marquee` | mDNS and DHCP hostname |
+| `ssid`, `pass` | from the setup portal | Wi-Fi credentials, `pass` is never returned |
+| `brightness` | 60 | 0-255 |
+| `power_ma` | 800 | Supply budget, `0` disables the limiter |
+| `tz` | `PST8PDT,M3.2.0,M11.1.0` | POSIX timezone for the clock |
+| `status_*` | see above | Status polling |
+| `clasp_enabled` | false | Connect to a CLASP relay |
+| `clasp_url` | `wss://relay.clasp.to` | Relay URL, `ws://` or `wss://` |
+| `clasp_device` | `esp` + chip id | Address namespace on the relay |
+| `reboot` | - | Pass `true` to restart after saving |
+
+## Stored animation format
+
+Each is a file in the panel's filesystem under `/anim/`:
 
     "MQA1"  4 bytes
     width   uint16 big-endian

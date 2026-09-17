@@ -35,7 +35,7 @@ button.go{background:var(--accent);color:#141414;border-color:var(--accent);font
 <input id="text" class="wide" placeholder="Type something" autocomplete="off">
 <div class="row" style="margin-top:10px">
   <div style="flex:0 0 52px"><label>Color</label><input type="color" id="color" value="#ff9f43"></div>
-  <div><label>Speed</label><input id="speed" type="number" value="45" min="5" max="300"></div>
+  <div><label>Speed</label><input id="speed" type="number" value="20" min="5" max="300"></div>
   <div><label>Repeat</label><input id="repeat" type="number" value="1" min="1" max="99"></div>
   <div style="flex:0 0 auto"><label>&nbsp;</label><button class="go" onclick="say()">Send</button></div>
 </div>
@@ -94,7 +94,7 @@ async function load(){
   s.animations.forEach(n=>{
     const b=document.createElement('button');
     b.textContent=n; b.onclick=()=>send({anim:n,now:true});
-    b.oncontextmenu=e=>{e.preventDefault();send({idle:n})};
+    b.oncontextmenu=e=>{e.preventDefault();send({idle:n})}; // right click: make it the idle background
     $('anims').appendChild(b);
   });
   $('stored').innerHTML='';
@@ -103,7 +103,9 @@ async function load(){
     b.textContent='> '+n; b.onclick=()=>send({play:n,now:true,repeat:3});
     $('stored').appendChild(b);
   });
-  $('status').textContent=`${s.ip} - ${s.draw_ma} mA of ${s.power_ma} - heap ${s.free_heap} - up ${s.uptime_s}s`;
+  const st=s.status||{};
+  const lab=st.enabled?(st.valid?(st.on?' - LAB OPEN':' - lab closed'):' - lab status pending'):'';
+  $('status').textContent=`${s.ip} - ${s.draw_ma} mA of ${s.power_ma} - heap ${s.free_heap} - up ${s.uptime_s}s${lab}`;
 }
 
 const cells=[];

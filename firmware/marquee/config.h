@@ -14,15 +14,40 @@
 
 // --- Wi-Fi ------------------------------------------------------------------
 // Leave empty to get the setup portal (AP "marquee-setup") on first boot.
+// Both can also be supplied as build flags, to keep them out of the source.
+#ifndef WIFI_SSID
 #define WIFI_SSID ""
+#endif
+#ifndef WIFI_PASS
 #define WIFI_PASS ""
+#endif
 
 // --- Defaults ---------------------------------------------------------------
 #define DEFAULT_HOSTNAME   "marquee"
 #define DEFAULT_BRIGHTNESS 60      // 0-255
 #define DEFAULT_POWER_MA   800     // supply budget, see README
-#define DEFAULT_IDLE       "clock" // effect shown when nothing is queued
 #define DEFAULT_TZ         "PST8PDT,M3.2.0,M11.1.0"
+#define DEFAULT_ROTATE_MS  15000   // how long each idle entry stays up
+
+// --- Status poll ------------------------------------------------------------
+// Polls a JSON endpoint for a boolean and shows something extra while it is
+// true. The defaults watch whether HeatSync Labs is open.
+#define DEFAULT_STATUS_URL   "https://members.heatsynclabs.org/space_api.json"
+#define DEFAULT_STATUS_KEY   "open"
+#define DEFAULT_STATUS_POLL  300   // seconds between polls
+#define DEFAULT_STATUS_EVERY 2     // show it every Nth idle entry while true
+#define STATUS_TLS_BUFFER    4096  // BearSSL receive buffer for the poll
+#define DEFAULT_STATUS_TEXT  "LAB OPEN"
+#define DEFAULT_STATUS_COLOR "#33ff66"
+
+// --- CLASP relay ------------------------------------------------------------
+// A wss:// relay behind a CDN sends TLS records up to 16 KB and will not
+// negotiate anything smaller, so the receive buffer has to be this big. With
+// the web server and the panel running there is not enough heap left for it,
+// and the firmware says so and stays on rather than trying. A ws:// relay on
+// your own network costs nothing. See docs/clasp.md.
+#define CLASP_TLS_BUFFER  16384
+#define CLASP_TLS_HEAP    (CLASP_TLS_BUFFER + 14000)
 
 // --- Network ----------------------------------------------------------------
 #define HTTP_PORT 80

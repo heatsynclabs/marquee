@@ -11,9 +11,45 @@
 #include "net.h"
 #include "player.h"
 #include "settings.h"
+#include "status.h"
 #include "web.h"
 
 static uint32_t lastFrame = 0;
+
+// If the board resets three times in a row without reaching a steady state,
+// turn the optional relay client off rather than looping forever. The counter
+// lives in RTC memory, so it survives a crash but not a power cycle.
+static const uint32_t kGuardMagic = 0x4d515545;
+static const uint32_t kGuardSlot  = 64;
+static const uint32_t kSettleMs   = 20000;
+static bool guardArmed = false;
+
+struct Guard {
+  uint32_t magic;
+  uint32_t boots;
+};
+
+static void guardStart() {
+  Guard g;
+  ESP.rtcUserMemoryRead(kGuardSlot, (uint32_t*)&g, sizeof g);
+  g.boots = (g.magic == kGuardMagic) ? g.boots + 1 : 1;
+  g.magic = kGuardMagic;
+  ESP.rtcUserMemoryWrite(kGuardSlot, (uint32_t*)&g, sizeof g);
+  guardArmed = true;
+
+  if (g.boots >= 3 && settings.claspEnabled) {
+    Serial.printf("guard: %u quick restarts, disabling the clasp relay\n", g.boots);
+    settings.claspEnabled = false;
+    settings.save();
+  }
+}
+
+static void guardSettle() {
+  if (!guardArmed || millis() < kSettleMs) return;
+  guardArmed = false;
+  Guard g = {kGuardMagic, 0};
+  ESP.rtcUserMemoryWrite(kGuardSlot, (uint32_t*)&g, sizeof g);
+}
 
 void setup() {
   Serial.begin(115200);
@@ -21,19 +57,16 @@ void setup() {
 
   LittleFS.begin();
   settings.load();
+  guardStart();
 
   matrix.begin();
   player.begin();
-
-  Item idle;
-  idle.kind = Item::Effect;
-  idle.effect = Effects::find(settings.idle);
-  if (idle.effect < 0) idle.effect = 0;
-  player.setIdle(idle);
+  Commands::loadRotation();
 
   Net::begin();
   Web::begin();
   ClaspLink::begin();
+  Status::begin();
 
   if (Net::apMode()) {
     Item msg;
@@ -55,7 +88,9 @@ void loop() {
   Net::loop();
   Web::loop();
   ClaspLink::loop();
+  Status::loop();
   settings.tick();
+  guardSettle();
 
   if (millis() - lastFrame >= FRAME_MS) {
     lastFrame = millis();

@@ -1,7 +1,9 @@
 // What the panel is showing right now, plus the queue of what comes next.
 //
-// Every request turns into an Item. Items are played in order; when the queue
-// drains the panel falls back to the idle item (an effect, by default).
+// Every request turns into an Item. Items are played in order. When the queue
+// drains the panel falls back to the idle rotation: a short list of items that
+// take turns, with an extra entry mixed in while the status poll says its
+// watched value is true.
 #pragma once
 #include <Arduino.h>
 #include <LittleFS.h>
@@ -16,7 +18,7 @@ struct Item {
   uint32_t color   = 0xFFFFFF;
   bool     rainbow = false;
   bool     scroll  = true;
-  uint16_t speed   = 45;      // pixels per second
+  uint16_t speed   = 20;      // pixels per second
   int16_t  repeat  = 1;       // -1 repeats forever
   uint32_t hold    = 0;       // ms; 0 means "derive from repeat"
   uint16_t fps     = 0;       // stored animation override
@@ -24,13 +26,26 @@ struct Item {
 
 class Player {
  public:
+  static const uint8_t kRotation = 6;
+  static const uint8_t kQueue = 8;
+
   void begin();
 
   void play(const Item& it);      // drops the queue and starts now
   bool enqueue(const Item& it);   // false when the queue is full
   void clearQueue();
-  void setIdle(const Item& it);
   void skip();
+
+  // Idle rotation.
+  void setRotation(const Item* items, uint8_t count, uint32_t dwellMs);
+  void setRotation(const Item& single);        // convenience: one entry
+  void setStatusItem(const Item& it, bool present);
+  bool hasStatusItem() const { return statusItemSet_; }
+  const Item& statusItem() const { return statusItem_; }
+  uint8_t rotationCount() const { return rotLen_; }
+  const Item& rotationAt(uint8_t i) const { return rotation_[i]; }
+  uint32_t dwellMs() const { return dwell_; }
+  void setDwell(uint32_t ms) { dwell_ = ms ? ms : 1000; }
 
   // A realtime source (UDP or a WebSocket binary frame) took over the panel.
   void realtimeFrame(uint32_t timeoutMs);
@@ -45,14 +60,22 @@ class Player {
  private:
   void start(const Item& it, bool asIdle);
   void fallback(bool asIdle);
-  uint32_t reps() const { return cur_.repeat > 0 ? (uint32_t)cur_.repeat : 1; }
+  void nextIdle();
   bool renderText(Matrix& m, uint32_t elapsed);
   bool renderStored(Matrix& m, uint32_t elapsed);
+  uint32_t reps() const { return cur_.repeat > 0 ? (uint32_t)cur_.repeat : 1; }
 
-  Item cur_, idleItem_;
+  Item cur_;
   bool idle_ = true;
 
-  static const uint8_t kQueue = 8;
+  Item     rotation_[kRotation];
+  uint8_t  rotLen_ = 1, rotIdx_ = 0;
+  uint32_t dwell_ = 15000;
+  uint32_t idleCount_ = 0;
+
+  Item statusItem_;
+  bool statusItemSet_ = false;
+
   Item     queue_[kQueue];
   uint8_t  qHead_ = 0, qLen_ = 0;
 

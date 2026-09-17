@@ -7,6 +7,9 @@ plays them.
 - `http://marquee.local/` for a small web UI
 - one JSON command over HTTP, WebSocket, UDP or a CLASP relay
 - eleven built-in effects, a clock, and animations you upload yourself
+- an idle rotation that cycles through whatever you want it showing
+- watches a JSON endpoint and mixes in a message while it is true, which is
+  how it shows LAB OPEN when HeatSync Labs is open
 - live pixel streaming at 50 fps
 - power-limited so a USB supply will not brown out
 
@@ -52,7 +55,11 @@ reboots and appears on your network as `marquee.local`.
 
 Later updates can go over the air:
 
-    arduino-cli upload -b esp8266:esp8266:nodemcuv2 -p marquee.local firmware/marquee
+    OTA=$(find ~/Library/Arduino15/packages/esp8266 -name espota.py | head -1)
+    python3 "$OTA" -i marquee.local -f /path/to/marquee.ino.bin
+
+Building with `-b esp8266:esp8266:nodemcuv2:xtal=160` runs the board at 160 MHz,
+which halves the pause during a status poll. Everything else works the same.
 
 ## Use it
 
@@ -73,10 +80,40 @@ Or the bundled client:
     tools/marquee.py play cat
     tools/marquee.py stream cat.gif --loop
 
-Messages queue up and play in order. When the queue drains the panel returns
-to its idle effect, which is the clock out of the box.
+Messages queue up and play in order. When the queue drains the panel returns to
+its idle rotation.
 
 The full command reference is in [docs/api.md](docs/api.md).
+
+## What it shows when nobody is talking to it
+
+The idle rotation is a short list of things that take turns, fifteen seconds
+each by default:
+
+    tools/marquee.py rotate --set clock plasma
+    tools/marquee.py rotate --set clock '{"text":"HEATSYNC LABS","color":"#ff9f43"}'
+    tools/marquee.py rotate --ms 20000
+
+A message always interrupts the rotation and the rotation picks up again
+afterwards.
+
+## Lab open status
+
+The panel polls a JSON endpoint every five minutes and, while the value it
+watches is true, mixes an extra entry into the rotation every other turn:
+
+    clock -> LAB OPEN -> HEATSYNC LABS -> LAB OPEN -> plasma -> LAB OPEN -> ...
+
+Out of the box it reads `https://members.heatsynclabs.org/space_api.json` and
+watches `open`, the same SpaceAPI document the HeatSync Labs website uses for
+its own door indicator. When the lab is closed, nothing extra is shown.
+
+    tools/marquee.py status                     what it last saw
+    tools/marquee.py rotate --open "LAB OPEN"   change the message
+    tools/marquee.py rotate --open ""           turn it off
+
+Point it somewhere else with `status_url` and `status_key`; any endpoint
+returning a JSON boolean works. Details in [docs/api.md](docs/api.md).
 
 ## Animations
 
@@ -97,8 +134,16 @@ Hyperion can drive it directly. `tools/marquee.py stream` uses the same path.
 ## Control from outside your network
 
 The panel can also be driven through a [CLASP](https://clasp.to) relay, which
-gives it an address that works from anywhere. See [docs/clasp.md](docs/clasp.md)
-for the two ways to set that up and the trade-offs between them.
+gives it an address that works from anywhere:
+
+    tools/clasp_bridge.py --device kitchen --host marquee.local
+    tools/marquee.py --relay wss://relay.clasp.to --device kitchen say "on my way"
+
+The bridge holds the connection to the public relay so the ESP8266 does not
+have to; there is also a small local relay in `tools/clasp_relay.py` if you
+would rather keep everything on your own network. [docs/clasp.md](docs/clasp.md)
+covers all three arrangements and why the panel cannot reach
+`wss://relay.clasp.to` by itself.
 
 ## Power
 
@@ -108,20 +153,23 @@ budget, 800 mA by default. Raise it once you know your supply:
 
     curl -d '{"power_ma":3000}' http://marquee.local/api/config
 
-Set it to `0` to disable the limiter entirely.
+Set it to `0` to disable the limiter entirely. `draw_ma` in `/api/state` shows
+what the current frame is asking for; when it equals `power_ma` the limiter is
+dimming the panel.
 
 ## Layout
 
     firmware/marquee/   the sketch
-      config.h          pin, panel size and wiring
+      config.h          pin, panel size, wiring and defaults
       matrix.*          pixel buffer, mapping, text drawing
       effects.*         built-in animations
-      player.*          the queue and playback
+      player.*          the queue and the idle rotation
       commands.*        the JSON command interpreter
       web.*             HTTP, WebSocket and UDP
+      status.*          the JSON status poll
       clasp_link.*      optional relay client
       net.*             Wi-Fi, setup portal, mDNS, OTA
-    tools/              command line client and relay bridge
+    tools/              command line client, relay bridge and a local relay
     docs/               API and relay documentation
 
 ## License

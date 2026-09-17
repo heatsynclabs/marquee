@@ -1,7 +1,9 @@
 #include "clasp_link.h"
 #include "commands.h"
+#include "config.h"
 #include "settings.h"
 #include <ESP8266WiFi.h>
+#include <stdarg.h>
 #include <WiFiClientSecure.h>
 
 namespace {
@@ -26,7 +28,7 @@ const size_t   kRxMax       = 1024;  // larger frames are skipped, not buffered
 const size_t   kTxMax       = 256;
 const uint32_t kRetryMs     = 15000;
 const uint32_t kPingMs      = 30000;
-const uint32_t kTlsHeapNeed = 26000;
+const uint32_t kTlsHeapNeed = CLASP_TLS_HEAP;
 
 WiFiClient* sock = nullptr;
 bool  secure = false;
@@ -38,6 +40,7 @@ char  base[48] = "";  // "/marquee/<device>"
 
 enum State : uint8_t { Down, Handshaking, Open } state = Down;
 uint32_t nextTry = 0, lastRx = 0, lastPing = 0;
+char note[48] = "off";
 
 uint8_t  rx[kRxMax];
 size_t   rxLen = 0;
@@ -48,6 +51,14 @@ uint64_t payloadLeft = 0;
 bool     framePayload = false;
 uint8_t  frameOp = 0;
 bool     frameMasked = false;
+
+void say(const char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(note, sizeof note, fmt, ap);
+  va_end(ap);
+  Serial.printf("clasp: %s\n", note);
+}
 
 void reset(bool retry = true) {
   if (sock) {
@@ -211,7 +222,7 @@ void onClasp(const uint8_t* p, size_t len) {
     case MSG_WELCOME:
       sendSubscribe();
       publishStatus("online");
-      Serial.println("clasp: connected");
+      say("connected");
       break;
     case MSG_PING:
       sendPong();
@@ -334,7 +345,7 @@ void readHandshake() {
       bool ok = rxLen >= 12 && !memcmp(rx, "HTTP/1.1 101", 12);
       rxLen = 0;
       if (!ok) {
-        Serial.println("clasp: handshake refused");
+        say("handshake refused");
         reset();
         return;
       }
@@ -349,12 +360,12 @@ void readHandshake() {
 
 void connect() {
   if (!parseUrl(settings.claspUrl)) {
-    Serial.println("clasp: bad url");
+    say("bad url");
     nextTry = millis() + 60000;
     return;
   }
   if (secure && ESP.getFreeHeap() < kTlsHeapNeed) {
-    Serial.println("clasp: not enough heap for TLS, retrying");
+    say("%u free, TLS needs %u", ESP.getFreeHeap(), (unsigned)kTlsHeapNeed);
     nextTry = millis() + kRetryMs;
     return;
   }
@@ -362,16 +373,22 @@ void connect() {
   if (secure) {
     BearSSL::WiFiClientSecure* tls = new BearSSL::WiFiClientSecure();
     tls->setInsecure();
-    tls->setBufferSizes(16384, 512);
+    tls->setBufferSizes(CLASP_TLS_BUFFER, 512);
     sock = tls;
   } else {
     sock = new WiFiClient();
   }
   sock->setTimeout(8000);
 
-  Serial.printf("clasp: connecting to %s:%u\n", host, port);
+  say("connecting to %s:%u", host, port);
   if (!sock->connect(host, port)) {
-    Serial.println("clasp: connect failed");
+    if (secure) {
+      char why[32] = "";
+      ((BearSSL::WiFiClientSecure*)sock)->getLastSSLError(why, sizeof why);
+      say("tls failed: %s", why[0] ? why : "no error");
+    } else {
+      say("connect failed");
+    }
     reset();
     return;
   }
@@ -404,7 +421,13 @@ void ClaspLink::loop() {
   }
 
   if (!sock->connected() && !sock->available()) {
-    Serial.println("clasp: disconnected");
+    if (secure) {
+      char why[32] = "";
+      ((BearSSL::WiFiClientSecure*)sock)->getLastSSLError(why, sizeof why);
+      say("tls dropped: %s", why[0] ? why : "no error");
+    } else {
+      say("disconnected");
+    }
     reset();
     return;
   }
@@ -425,3 +448,4 @@ void ClaspLink::loop() {
 
 bool ClaspLink::connected() { return state == Open; }
 const char* ClaspLink::deviceId() { return device; }
+const char* ClaspLink::lastNote() { return note; }

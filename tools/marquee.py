@@ -166,6 +166,35 @@ def cmd_upload(args):
     print(f"\nstored as '{args.name}' - play it with: marquee.py play {args.name}")
 
 
+def cmd_rotate(args):
+    """Shows or edits the idle rotation."""
+    rot = get(args.host, "/api/rotate")
+    changed = False
+    if args.ms:
+        rot["ms"] = args.ms
+        changed = True
+    if args.set:
+        rot["items"] = [json.loads(x) if x.lstrip().startswith("{") else {"anim": x}
+                        for x in args.set]
+        changed = True
+    if args.open is not None:
+        rot["open"] = {"text": args.open, "color": args.open_color} if args.open else False
+        changed = True
+    if changed:
+        post(args.host, "/api/rotate", json.dumps(rot))
+        rot = get(args.host, "/api/rotate")
+    print(json.dumps(rot, indent=2))
+
+
+def cmd_status(args):
+    st = get(args.host, "/api/state")["status"]
+    if args.poll:
+        post(args.host, "/api/status/poll", b"")
+        time.sleep(3)
+        st = get(args.host, "/api/state")["status"]
+    print(json.dumps(st, indent=2))
+
+
 def cmd_rm(args):
     print(post(args.host, f"/api/anim?name={args.name}", b"", method="DELETE"))
 
@@ -181,7 +210,7 @@ def main():
     s = sub.add_parser("say", help="scroll a message")
     s.add_argument("text", nargs="+")
     s.add_argument("--color", default="white", help="name, #rrggbb, or 'rainbow'")
-    s.add_argument("--speed", type=int, default=45, help="pixels per second")
+    s.add_argument("--speed", type=int, default=20, help="pixels per second")
     s.add_argument("--repeat", type=int, default=1)
     s.add_argument("--static", action="store_true", help="do not scroll")
     s.add_argument("--now", action="store_true", help="interrupt what is playing")
@@ -227,6 +256,19 @@ def main():
     s.add_argument("--fps", type=int, default=12)
     s.add_argument("--fit", choices=["cover", "stretch"], default="cover")
     s.set_defaults(func=cmd_upload)
+
+    s = sub.add_parser("rotate", help="show or change the idle rotation")
+    s.add_argument("--set", nargs="+", metavar="ENTRY",
+                   help="effect names, or JSON command objects")
+    s.add_argument("--ms", type=int, help="how long each entry stays up")
+    s.add_argument("--open", metavar="TEXT",
+                   help="what to show while the status poll is true; empty string turns it off")
+    s.add_argument("--open-color", default="#33ff66")
+    s.set_defaults(func=cmd_rotate)
+
+    s = sub.add_parser("status", help="show the status poll")
+    s.add_argument("--poll", action="store_true", help="poll now and wait for the result")
+    s.set_defaults(func=cmd_status)
 
     s = sub.add_parser("rm", help="delete a stored animation")
     s.add_argument("name")

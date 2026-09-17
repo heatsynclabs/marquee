@@ -8,8 +8,12 @@ struct Settings {
   char     pass[65];
   uint8_t  brightness;
   uint16_t powerMa;
-  char     idle[48];      // effect name shown when the queue drains
   char     tz[48];        // POSIX TZ string for the clock effect
+  bool     statusEnabled;
+  char     statusUrl[112];
+  char     statusKey[24];
+  uint16_t statusPollS;
+  uint8_t  statusEvery;
   bool     claspEnabled;
   char     claspUrl[96];  // ws:// or wss:// relay URL
   char     claspDevice[32];

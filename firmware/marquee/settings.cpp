@@ -18,8 +18,12 @@ void Settings::defaults() {
   copyStr(pass, sizeof pass, WIFI_PASS);
   brightness = DEFAULT_BRIGHTNESS;
   powerMa    = DEFAULT_POWER_MA;
-  copyStr(idle, sizeof idle, DEFAULT_IDLE);
   copyStr(tz, sizeof tz, DEFAULT_TZ);
+  statusEnabled = true;
+  copyStr(statusUrl, sizeof statusUrl, DEFAULT_STATUS_URL);
+  copyStr(statusKey, sizeof statusKey, DEFAULT_STATUS_KEY);
+  statusPollS = DEFAULT_STATUS_POLL;
+  statusEvery = DEFAULT_STATUS_EVERY;
   claspEnabled = false;
   copyStr(claspUrl, sizeof claspUrl, "wss://relay.clasp.to");
   copyStr(claspDevice, sizeof claspDevice, "");
@@ -35,12 +39,22 @@ bool Settings::load() {
   if (err) return false;
 
   copyStr(host, sizeof host, doc["host"] | host);
-  copyStr(ssid, sizeof ssid, doc["ssid"] | ssid);
-  copyStr(pass, sizeof pass, doc["pass"] | pass);
+
+  // A stored network wins, but an empty one falls back to the build defaults
+  // so that setting WIFI_SSID still works on a board that has booted before.
+  const char* savedSsid = doc["ssid"] | "";
+  if (savedSsid[0]) {
+    copyStr(ssid, sizeof ssid, savedSsid);
+    copyStr(pass, sizeof pass, doc["pass"] | "");
+  }
   brightness = doc["brightness"] | brightness;
   powerMa    = doc["power_ma"] | powerMa;
-  copyStr(idle, sizeof idle, doc["idle"] | idle);
   copyStr(tz, sizeof tz, doc["tz"] | tz);
+  statusEnabled = doc["status_enabled"] | statusEnabled;
+  copyStr(statusUrl, sizeof statusUrl, doc["status_url"] | statusUrl);
+  copyStr(statusKey, sizeof statusKey, doc["status_key"] | statusKey);
+  statusPollS = doc["status_poll_s"] | statusPollS;
+  statusEvery = doc["status_every"] | statusEvery;
   claspEnabled = doc["clasp_enabled"] | claspEnabled;
   copyStr(claspUrl, sizeof claspUrl, doc["clasp_url"] | claspUrl);
   copyStr(claspDevice, sizeof claspDevice, doc["clasp_device"] | claspDevice);
@@ -54,8 +68,12 @@ bool Settings::save() {
   doc["pass"]          = pass;
   doc["brightness"]    = brightness;
   doc["power_ma"]      = powerMa;
-  doc["idle"]          = idle;
   doc["tz"]            = tz;
+  doc["status_enabled"]= statusEnabled;
+  doc["status_url"]    = statusUrl;
+  doc["status_key"]    = statusKey;
+  doc["status_poll_s"] = statusPollS;
+  doc["status_every"]  = statusEvery;
   doc["clasp_enabled"] = claspEnabled;
   doc["clasp_url"]     = claspUrl;
   doc["clasp_device"]  = claspDevice;

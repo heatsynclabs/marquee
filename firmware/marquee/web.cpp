@@ -5,6 +5,7 @@
 #include "net.h"
 #include "player.h"
 #include "settings.h"
+#include "status.h"
 #include "ui.h"
 #include <ArduinoJson.h>
 #include <ESP8266WebServer.h>
@@ -36,8 +37,10 @@ void sendErr(int code, const String& msg) {
   sendJson(code, doc);
 }
 
-// Accepts base64 or hex. Returns the number of bytes written.
-size_t decodeFrame(const String& in, uint8_t* out, size_t cap) {
+// Accepts base64 or hex. Which one is decided by length, not by the characters
+// used: a frame of zeroes encodes to "AAAA..." in base64, which is also valid
+// hex. Returns the number of bytes written.
+size_t decodeFrame(const String& in, uint8_t* out, size_t cap, size_t expect) {
   auto hex = [](char c) -> int {
     if (c >= '0' && c <= '9') return c - '0';
     if (c >= 'a' && c <= 'f') return c - 'a' + 10;
@@ -47,15 +50,14 @@ size_t decodeFrame(const String& in, uint8_t* out, size_t cap) {
   size_t n = in.length();
   while (n && (in[n - 1] == '\n' || in[n - 1] == '\r' || in[n - 1] == '=')) n--;
 
-  bool looksHex = true;
-  for (size_t i = 0; i < n && looksHex; i++) looksHex = hex(in[i]) >= 0;
+  bool isHex = (n == expect * 2);
+  for (size_t i = 0; i < n && isHex; i++) isHex = hex(in[i]) >= 0;
 
-  if (looksHex && (n % 2) == 0) {
-    size_t bytes = n / 2;
-    if (bytes > cap) return 0;
-    for (size_t i = 0; i < bytes; i++)
+  if (isHex) {
+    if (expect > cap) return 0;
+    for (size_t i = 0; i < expect; i++)
       out[i] = (hex(in[2 * i]) << 4) | hex(in[2 * i + 1]);
-    return bytes;
+    return expect;
   }
 
   static const char* kAlpha =
@@ -138,8 +140,12 @@ void handleConfigGet() {
   doc["ssid"]          = settings.ssid;
   doc["brightness"]    = settings.brightness;
   doc["power_ma"]      = settings.powerMa;
-  doc["idle"]          = settings.idle;
   doc["tz"]            = settings.tz;
+  doc["status_enabled"]= settings.statusEnabled;
+  doc["status_url"]    = settings.statusUrl;
+  doc["status_key"]    = settings.statusKey;
+  doc["status_poll_s"] = settings.statusPollS;
+  doc["status_every"]  = settings.statusEvery;
   doc["clasp_enabled"] = settings.claspEnabled;
   doc["clasp_url"]     = settings.claspUrl;
   doc["clasp_device"]  = settings.claspDevice;
@@ -156,13 +162,18 @@ void handleConfigPost() {
   str("host", settings.host, sizeof settings.host);
   str("ssid", settings.ssid, sizeof settings.ssid);
   str("pass", settings.pass, sizeof settings.pass);
-  str("idle", settings.idle, sizeof settings.idle);
   str("tz", settings.tz, sizeof settings.tz);
+  str("status_url", settings.statusUrl, sizeof settings.statusUrl);
+  str("status_key", settings.statusKey, sizeof settings.statusKey);
   str("clasp_url", settings.claspUrl, sizeof settings.claspUrl);
   str("clasp_device", settings.claspDevice, sizeof settings.claspDevice);
   if (doc["brightness"].is<int>()) settings.brightness = doc["brightness"].as<int>();
   if (doc["power_ma"].is<int>()) settings.powerMa = doc["power_ma"].as<int>();
   if (doc["clasp_enabled"].is<bool>()) settings.claspEnabled = doc["clasp_enabled"];
+  if (doc["status_enabled"].is<bool>()) settings.statusEnabled = doc["status_enabled"];
+  if (doc["status_poll_s"].is<int>()) settings.statusPollS = doc["status_poll_s"].as<int>();
+  if (doc["status_every"].is<int>()) settings.statusEvery = doc["status_every"].as<int>();
+  if (doc["status_url"].is<const char*>() || doc["status_key"].is<const char*>()) Status::pollNow();
   settings.save();
 
   bool reboot = doc["reboot"] | false;
@@ -174,6 +185,26 @@ void handleConfigPost() {
     delay(200);
     ESP.restart();
   }
+}
+
+void handleRotateGet() {
+  JsonDocument doc;
+  Commands::rotationJson(doc);
+  sendJson(200, doc);
+}
+
+// POST /api/rotate replaces the idle rotation: {"ms":15000,"items":[...],"open":{...}}
+void handleRotatePost() {
+  JsonDocument doc;
+  if (deserializeJson(doc, http.arg("plain"))) return sendErr(400, "bad JSON");
+  String err;
+  if (!Commands::applyRotation(doc.as<JsonObjectConst>(), err)) return sendErr(400, err);
+  sendOk();
+}
+
+void handleStatusPoll() {
+  Status::pollNow();
+  sendOk();
 }
 
 void handleAnimList() {
@@ -212,7 +243,7 @@ void handleAnimFrame() {
   if (!validName(name) || !LittleFS.exists(animPath(name)))
     return sendErr(404, "unknown animation");
 
-  size_t n = decodeFrame(http.arg("plain"), packet, sizeof packet);
+  size_t n = decodeFrame(http.arg("plain"), packet, sizeof packet, kFrameBytes);
   if (n != kFrameBytes) return sendErr(400, String("expected ") + kFrameBytes + " bytes, got " + n);
 
   File f = LittleFS.open(animPath(name), "a");
@@ -300,6 +331,9 @@ void Web::begin() {
   http.on("/api/cmd", handleCmd);
   http.on("/api/config", HTTP_GET, handleConfigGet);
   http.on("/api/config", HTTP_POST, handleConfigPost);
+  http.on("/api/rotate", HTTP_GET, handleRotateGet);
+  http.on("/api/rotate", HTTP_POST, handleRotatePost);
+  http.on("/api/status/poll", HTTP_POST, handleStatusPoll);
   http.on("/api/anim", HTTP_GET, handleAnimList);
   http.on("/api/anim", HTTP_POST, handleAnimNew);
   http.on("/api/anim", HTTP_DELETE, handleAnimDelete);

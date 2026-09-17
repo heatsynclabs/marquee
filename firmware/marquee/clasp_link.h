@@ -12,5 +12,6 @@ namespace ClaspLink {
 void begin();
 void loop();
 bool connected();
+const char* lastNote();
 const char* deviceId();
 }  // namespace ClaspLink

@@ -3,6 +3,9 @@
 #include "matrix.h"
 #include "player.h"
 #include "settings.h"
+#include "status.h"
+#include "clasp_link.h"
+#include "config.h"
 #include <ESP8266WiFi.h>
 #include <LittleFS.h>
 
@@ -61,6 +64,42 @@ static uint32_t colorField(JsonVariantConst v, uint32_t fallback, bool* rainbow)
   return fallback;
 }
 
+int Commands::buildItem(JsonObjectConst cmd, Item& it, String& err) {
+  const char* text = cmd["text"].as<const char*>();
+  if (!text) text = cmd["say"].as<const char*>();
+  const char* anim = cmd["anim"].as<const char*>();
+  const char* play = cmd["play"].as<const char*>();
+
+  if (text) {
+    it.kind = Item::Text;
+    strlcpy(it.arg, text, sizeof it.arg);
+  } else if (anim) {
+    it.kind = Item::Effect;
+    int fx = Effects::find(anim);
+    if (fx < 0) { err = "unknown animation"; return -1; }
+    it.effect = fx;
+  } else if (play) {
+    it.kind = Item::Stored;
+    strlcpy(it.arg, play, sizeof it.arg);
+    if (!LittleFS.exists(String("/anim/") + it.arg)) {
+      err = "no such stored animation";
+      return -1;
+    }
+  } else {
+    return 0;
+  }
+
+  bool rainbow = false;
+  it.color   = colorField(cmd["color"], it.color, &rainbow);
+  it.rainbow = cmd["rainbow"] | rainbow;
+  it.scroll  = cmd["scroll"] | true;
+  it.speed   = cmd["speed"] | it.speed;
+  it.repeat  = cmd["repeat"] | 1;
+  it.hold    = cmd["hold"] | 0U;
+  it.fps     = cmd["fps"] | 0;
+  return 1;
+}
+
 bool Commands::apply(JsonObjectConst cmd, String& err) {
   // A batch runs each element in order.
   if (cmd["queue"].is<JsonArrayConst>()) {
@@ -86,56 +125,41 @@ bool Commands::apply(JsonObjectConst cmd, String& err) {
     settings.powerMa = cmd["power_ma"].as<int>();
     dirty = true;
   }
-  if (cmd["idle"].is<const char*>()) {
-    const char* name = cmd["idle"].as<const char*>();
-    int fx = Effects::find(name);
-    if (fx < 0) { err = "unknown idle effect"; return false; }
-    Item it;
-    it.kind = Item::Effect;
-    it.effect = fx;
-    it.color = colorField(cmd["color"], 0xFFFFFF, nullptr);
-    strlcpy(settings.idle, name, sizeof settings.idle);
-    player.setIdle(it);
-    dirty = true;
+  if (!cmd["idle"].isNull()) {
+    if (!setRotation(cmd["idle"], err, true)) return false;
+  }
+  if (cmd["rotate"].is<JsonObjectConst>()) {
+    if (!applyRotation(cmd["rotate"].as<JsonObjectConst>(), err)) return false;
+  }
+  if (cmd["rotate_ms"].is<uint32_t>()) {
+    player.setDwell(cmd["rotate_ms"].as<uint32_t>());
+    saveRotation();
   }
 
-  // Build an item, if this command asks for one.
   Item it;
-  const char* text = cmd["text"].as<const char*>();
-  if (!text) text = cmd["say"].as<const char*>();
-  const char* anim = cmd["anim"].as<const char*>();
-  const char* play = cmd["play"].as<const char*>();
-
-  if (text) {
-    it.kind = Item::Text;
-    strlcpy(it.arg, text, sizeof it.arg);
-  } else if (anim) {
-    it.kind = Item::Effect;
-    it.effect = Effects::find(anim);
-    if (it.effect < 0) { err = "unknown animation"; return false; }
-  } else if (play) {
-    it.kind = Item::Stored;
-    strlcpy(it.arg, play, sizeof it.arg);
-    if (!LittleFS.exists(String("/anim/") + it.arg)) {
-      err = "no such stored animation";
-      return false;
-    }
-  } else {
+  int built = buildItem(cmd, it, err);
+  if (built < 0) return false;
+  if (built == 0) {
     if (dirty) settings.markDirty(cmd["save"] | false);
     return true;
   }
 
-  bool rainbow = false;
-  it.color   = colorField(cmd["color"], it.color, &rainbow);
-  it.rainbow = cmd["rainbow"] | rainbow;
-  it.scroll  = cmd["scroll"] | true;
-  it.speed   = cmd["speed"] | it.speed;
-  it.repeat  = cmd["repeat"] | 1;
-  it.hold    = cmd["hold"] | 0U;
-  it.fps     = cmd["fps"] | 0;
+  const bool now = cmd["now"] | false;
 
-  if (cmd["now"] | false) player.play(it);
-  else if (!player.enqueue(it)) { err = "queue full"; return false; }
+  // An effect with no time limit replaces the rotation rather than becoming a
+  // queue entry, so that a message sent afterwards still gets its turn.
+  if (it.kind == Item::Effect && it.hold == 0) {
+    player.setRotation(it);
+    if (now) {
+      player.clearQueue();
+      player.skip();
+    }
+  } else if (now) {
+    player.play(it);
+  } else if (!player.enqueue(it)) {
+    err = "queue full";
+    return false;
+  }
 
   if (dirty) settings.markDirty(cmd["save"] | false);
   return true;
@@ -166,23 +190,191 @@ void Commands::state(JsonDocument& out) {
   out["brightness"] = settings.brightness;
   out["power_ma"]   = settings.powerMa;
   out["draw_ma"]    = matrix.lastDrawMa();
-  out["idle"]       = settings.idle;
   out["queued"]     = player.queued();
   out["playing"]    = player.idleNow() ? "idle" : "item";
+
+  JsonObject st = out["status"].to<JsonObject>();
+  st["enabled"]     = settings.statusEnabled;
+  st["url"]         = settings.statusUrl;
+  st["key"]         = settings.statusKey;
+  st["on"]          = Status::on();
+  st["valid"]       = Status::valid();
+  st["every"]       = settings.statusEvery;
+  st["age_s"]       = Status::lastPollS();
+  st["poll_ms"]     = Status::lastPollMs();
+  st["last"]        = Status::lastError();
 
   JsonObject cur = out["current"].to<JsonObject>();
   cur["kind"] = c.kind == Item::Text ? "text" : (c.kind == Item::Stored ? "stored" : "anim");
   cur["arg"]  = c.kind == Item::Effect ? Effects::name(c.effect) : c.arg;
 
+  JsonDocument rot;
+  rotationJson(rot);
+  out["idle"] = rot;
+
   JsonArray fx = out["animations"].to<JsonArray>();
   for (int i = 0; i < Effects::count(); i++) fx.add(Effects::name(i));
 
-  JsonArray st = out["stored"].to<JsonArray>();
+  JsonArray stored = out["stored"].to<JsonArray>();
   Dir dir = LittleFS.openDir("/anim");
-  while (dir.next()) st.add(dir.fileName());
+  while (dir.next()) stored.add(dir.fileName());
 
   JsonObject cl = out["clasp"].to<JsonObject>();
   cl["enabled"] = settings.claspEnabled;
   cl["url"]     = settings.claspUrl;
   cl["device"]  = settings.claspDevice;
+  cl["connected"] = ClaspLink::connected();
+  cl["last"]    = ClaspLink::lastNote();
+}
+
+// --- idle rotation ----------------------------------------------------------
+
+static const char* kRotationPath = "/rotate.json";
+
+static void liveRotation(JsonDocument& out);
+
+static void itemJson(const Item& it, JsonObject o) {
+  char hex[8];
+  snprintf(hex, sizeof hex, "#%06lx", (unsigned long)(it.color & 0xFFFFFF));
+  switch (it.kind) {
+    case Item::Text:
+      o["text"] = it.arg;
+      // A char array is copied by ArduinoJson; a const char* would only be
+      // linked, and hex is about to go out of scope.
+      if (it.rainbow) o["color"] = "rainbow";
+      else o["color"] = hex;
+      if (it.speed != 20) o["speed"] = it.speed;
+      if (it.repeat != 1) o["repeat"] = it.repeat;
+      if (!it.scroll) o["scroll"] = false;
+      break;
+    case Item::Stored:
+      o["play"] = it.arg;
+      if (it.fps) o["fps"] = it.fps;
+      break;
+    default:
+      o["anim"] = Effects::name(it.effect);
+      if (it.color != 0xFFFFFF) o["color"] = hex;
+      break;
+  }
+  if (it.hold) o["hold"] = it.hold;
+}
+
+// The rotation as the player is running it right now.
+static void liveRotation(JsonDocument& out) {
+  out["ms"] = player.dwellMs();
+  JsonArray items = out["items"].to<JsonArray>();
+  for (uint8_t i = 0; i < player.rotationCount(); i++)
+    itemJson(player.rotationAt(i), items.add<JsonObject>());
+  if (player.hasStatusItem())
+    itemJson(player.statusItem(), out["open"].to<JsonObject>());
+}
+
+// What callers see: the saved configuration. A bare {"anim":...} swaps the
+// live rotation without saving, so reading this back and posting it again
+// never loses a rotation someone set on purpose.
+void Commands::rotationJson(JsonDocument& out) {
+  File f = LittleFS.open(kRotationPath, "r");
+  bool have = f && !deserializeJson(out, f);
+  if (f) f.close();
+  if (!have) {
+    out.clear();
+    liveRotation(out);
+  }
+}
+
+void Commands::saveRotation() {
+  JsonDocument doc;
+  liveRotation(doc);
+  File f = LittleFS.open(kRotationPath, "w");
+  if (!f) return;
+  serializeJson(doc, f);
+  f.close();
+}
+
+// The spec is an effect name, one command object, or a list of them.
+bool Commands::setRotation(JsonVariantConst spec, String& err, bool persist) {
+  Item items[Player::kRotation];
+  uint8_t n = 0;
+
+  if (spec.is<const char*>()) {
+    JsonDocument one;
+    one["anim"] = spec.as<const char*>();
+    if (buildItem(one.as<JsonObjectConst>(), items[0], err) != 1) {
+      if (!err.length()) err = "unknown idle effect";
+      return false;
+    }
+    n = 1;
+  } else if (spec.is<JsonArrayConst>()) {
+    for (JsonObjectConst o : spec.as<JsonArrayConst>()) {
+      if (n >= Player::kRotation) break;
+      Item it;
+      int built = buildItem(o, it, err);
+      if (built < 0) return false;
+      if (built == 1) items[n++] = it;
+    }
+  } else if (spec.is<JsonObjectConst>()) {
+    int built = buildItem(spec.as<JsonObjectConst>(), items[0], err);
+    if (built < 0) return false;
+    if (built == 1) n = 1;
+  }
+
+  if (!n) { err = "idle needs at least one entry"; return false; }
+  player.setRotation(items, n, 0);
+  if (persist) saveRotation();
+  return true;
+}
+
+bool Commands::setStatusItem(JsonVariantConst spec, String& err) {
+  if (spec.isNull() || spec.is<bool>()) {
+    player.setStatusItem(Item(), false);
+    saveRotation();
+    return true;
+  }
+  Item it;
+  if (buildItem(spec.as<JsonObjectConst>(), it, err) != 1) {
+    if (!err.length()) err = "bad open item";
+    return false;
+  }
+  player.setStatusItem(it, true);
+  saveRotation();
+  return true;
+}
+
+// Handles a whole rotation document: {"ms":..,"items":[..],"open":{..}}
+bool Commands::applyRotation(JsonObjectConst spec, String& err) {
+  if (spec["ms"].is<uint32_t>()) player.setDwell(spec["ms"].as<uint32_t>());
+  if (!spec["items"].isNull() && !setRotation(spec["items"], err, false)) return false;
+  if (spec["open"].is<JsonObjectConst>() || spec["open"].is<bool>()) {
+    if (!setStatusItem(spec["open"], err)) return false;
+  }
+  saveRotation();
+  return true;
+}
+
+void Commands::loadRotation() {
+  JsonDocument doc;
+  File f = LittleFS.open(kRotationPath, "r");
+  bool have = f && !deserializeJson(doc, f);
+  if (f) f.close();
+
+  String err;
+  if (have && doc["ms"].is<uint32_t>()) player.setDwell(doc["ms"].as<uint32_t>());
+  if (!have || !setRotation(doc["items"], err, false)) {
+    JsonDocument fallback;
+    fallback["anim"] = "clock";
+    setRotation(fallback.as<JsonVariantConst>(), err, false);
+  }
+
+  Item statusItem;
+  bool ok = false;
+  if (have && doc["open"].is<JsonObjectConst>()) {
+    ok = buildItem(doc["open"].as<JsonObjectConst>(), statusItem, err) == 1;
+  }
+  if (!ok) {
+    JsonDocument def;
+    def["text"] = DEFAULT_STATUS_TEXT;
+    def["color"] = DEFAULT_STATUS_COLOR;
+    ok = buildItem(def.as<JsonObjectConst>(), statusItem, err) == 1;
+  }
+  player.setStatusItem(statusItem, ok);
 }

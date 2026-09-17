@@ -1,6 +1,8 @@
 #include "player.h"
 #include "effects.h"
 #include "font5x7.h"
+#include "settings.h"
+#include "status.h"
 
 Player player;
 
@@ -8,13 +10,26 @@ Player player;
 static const size_t kHeader = 10;
 
 void Player::begin() {
-  idleItem_ = Item();
-  start(idleItem_, true);
+  rotation_[0] = Item();
+  rotLen_ = 1;
+  nextIdle();
 }
 
-void Player::setIdle(const Item& it) {
-  idleItem_ = it;
-  if (idle_) start(idleItem_, true);
+void Player::setRotation(const Item* items, uint8_t count, uint32_t dwellMs) {
+  if (count > kRotation) count = kRotation;
+  if (!count) return;
+  for (uint8_t i = 0; i < count; i++) rotation_[i] = items[i];
+  rotLen_ = count;
+  rotIdx_ = 0;
+  if (dwellMs) dwell_ = dwellMs;
+  if (idle_) nextIdle();
+}
+
+void Player::setRotation(const Item& single) { setRotation(&single, 1, 0); }
+
+void Player::setStatusItem(const Item& it, bool present) {
+  statusItem_ = it;
+  statusItemSet_ = present;
 }
 
 void Player::play(const Item& it) {
@@ -40,11 +55,26 @@ void Player::skip() {
     qLen_--;
     start(next, false);
   } else {
-    start(idleItem_, true);
+    nextIdle();
   }
 }
 
-// A broken item must never recurse back into the idle item.
+// Picks the next thing to show while nothing is queued. Every Nth turn goes to
+// the status item instead, so "open" keeps coming back around.
+void Player::nextIdle() {
+  const uint8_t every = settings.statusEvery ? settings.statusEvery : 2;
+  if (statusItemSet_ && Status::on() && (idleCount_ % every) == 0) {
+    idleCount_++;
+    start(statusItem_, true);
+    return;
+  }
+  idleCount_++;
+  const Item& next = rotation_[rotIdx_ % rotLen_];
+  rotIdx_ = (rotIdx_ + 1) % rotLen_;
+  start(next, true);
+}
+
+// A broken item must never recurse back into the rotation.
 void Player::fallback(bool asIdle) {
   if (asIdle) {
     cur_ = Item();
@@ -154,5 +184,14 @@ void Player::tick(Matrix& m) {
       break;
   }
 
-  if (done && !idle_) skip();
+  if (!done && idle_ && rotLen_ + (statusItemSet_ ? 1 : 0) > 1) {
+    // Only move along on time when there is somewhere else to go.
+    uint32_t limit = cur_.hold ? cur_.hold : dwell_;
+    done = elapsed >= limit;
+  }
+
+  if (done) {
+    if (idle_) nextIdle();
+    else skip();
+  }
 }
