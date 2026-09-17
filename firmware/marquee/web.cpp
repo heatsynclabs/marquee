@@ -87,6 +87,14 @@ String toString(const uint8_t* p, size_t n) {
   return s;
 }
 
+// curl -d sends a form content type unless told otherwise, and the server then
+// parses the JSON body as a parameter name. Accept it either way.
+String bodyJson() {
+  if (http.hasArg("plain") && http.arg("plain").length()) return http.arg("plain");
+  if (http.args() == 1 && http.argName(0).startsWith("{")) return http.argName(0);
+  return String();
+}
+
 String animPath(const String& name) { return "/anim/" + name; }
 
 bool validName(const String& n) {
@@ -110,12 +118,8 @@ void handleState() {
 void handleCmd() {
   String err;
   bool ok;
-  if (http.hasArg("plain") && http.arg("plain").length()) {
-    ok = Commands::applyJson(http.arg("plain"), err);
-  } else if (http.args() == 1 && http.argName(0).startsWith("{")) {
-    // curl -d sends a form content type by default, so the body arrives as a
-    // parameter name. Treat a lone JSON-looking name as the body.
-    String body = http.argName(0);
+  String body = bodyJson();
+  if (body.length()) {
     ok = Commands::applyJson(body, err);
   } else {
     JsonDocument doc;
@@ -154,7 +158,7 @@ void handleConfigGet() {
 
 void handleConfigPost() {
   JsonDocument doc;
-  if (deserializeJson(doc, http.arg("plain"))) return sendErr(400, "bad JSON");
+  if (deserializeJson(doc, bodyJson())) return sendErr(400, "bad JSON");
 
   auto str = [&](const char* key, char* dst, size_t n) {
     if (doc[key].is<const char*>()) strlcpy(dst, doc[key].as<const char*>(), n);
@@ -196,7 +200,7 @@ void handleRotateGet() {
 // POST /api/rotate replaces the idle rotation: {"ms":15000,"items":[...],"open":{...}}
 void handleRotatePost() {
   JsonDocument doc;
-  if (deserializeJson(doc, http.arg("plain"))) return sendErr(400, "bad JSON");
+  if (deserializeJson(doc, bodyJson())) return sendErr(400, "bad JSON");
   String err;
   if (!Commands::applyRotation(doc.as<JsonObjectConst>(), err)) return sendErr(400, err);
   sendOk();
