@@ -1,6 +1,7 @@
 // A small robot that lives on the panel: it walks in, waves, hops and walks
-// off, then flies across on a jetpack trailing stripes. About one appearance
-// in three the stripes are the trans flag instead of the rainbow.
+// off. Between its walks the HeatSync Labs mark flies across trailing
+// stripes; about one appearance in three they are the trans flag instead of
+// the rainbow.
 //
 // Everything is a 6x7 sprite drawn from strings plus integer maths, so it
 // costs less than the clock.
@@ -26,8 +27,19 @@ const char* const kWaveUp[SH] = {
 const char* const kWaveDown[SH] = {
     "..a...", ".hhhh.", ".heehr", ".hhhhr", "rbbbb.", ".bbbb.", ".l..l.",
 };
-const char* const kFly[SH] = {
-    "..a...", ".hhhh.", ".heeh.", ".hhhhr", "fbbbb.", "fbbbb.", "ll....",
+// The HeatSync Labs mark at 8x8: the orange sun with its curved arrow cut
+// out. The mark's flames are black, which an LED cannot show, so a couple of
+// embers flicker where they would be instead.
+const int LW = 9, LH = 8;
+const char* const kLogo[LH] = {
+    "..oooo.x.",
+    ".o.oooo.x",
+    "o.oooooo.",
+    "oo.ooooox",
+    "o...oooo.",
+    "oo.oooox.",
+    ".oo...o.x",
+    "..oooo...",
 };
 
 uint32_t ink(char c, uint32_t ms) {
@@ -38,14 +50,16 @@ uint32_t ink(char c, uint32_t ms) {
     case 'b': return 0xFF8A1E;                               // HeatSync orange
     case 'r': return 0xB8C4CC;
     case 'l': return 0x8090A0;
-    case 'f': return (ms / 80) & 1 ? 0xFFD000 : 0xFF4000;    // flicker
+    case 'o': return 0xF99A1C;                               // the mark's orange
+    case 'x': return (ms / 140) & 1 ? 0xC02000 : 0x501000;   // embers
     default:  return 0;
   }
 }
 
-void sprite(Matrix& m, const char* const* rows, int x, int y, uint32_t ms) {
-  for (int r = 0; r < SH; r++)
-    for (int c = 0; c < SW; c++) {
+void sprite(Matrix& m, const char* const* rows, int x, int y, uint32_t ms,
+            int w = SW, int h = SH) {
+  for (int r = 0; r < h; r++)
+    for (int c = 0; c < w; c++) {
       char ch = rows[r][c];
       if (ch != '.') m.pixel(x + c, y + r, ink(ch, ms));
     }
@@ -83,11 +97,11 @@ void walk(Matrix& m, uint32_t t, uint32_t ms) {
   if (x < W) sprite(m, pose, x, y, ms);
 }
 
-// Fly: robot crosses with a stripe trail behind it that follows it off.
+// Fly: the mark crosses with a stripe trail behind it that follows it off.
 const int kTrail = 26;
-const uint32_t kFlyMs = (uint32_t)(W + SW + kTrail) * 1000 / 12;  // 12 px/s
+const uint32_t kFlyMs = (uint32_t)(W + LW + kTrail) * 1000 / 12;  // 12 px/s
 void fly(Matrix& m, uint32_t t, uint32_t ms, bool trans) {
-  const int x = -SW + (int)(t * 12 / 1000);
+  const int x = -LW + (int)(t * 12 / 1000);
   const int bob = ((ms / 300) & 1);
   const uint32_t* stripes = trans ? kTrans : kRainbow;
 
@@ -106,7 +120,7 @@ void fly(Matrix& m, uint32_t t, uint32_t ms, bool trans) {
     const int wave = (((tx - (int)(ms / 120)) >> 2) & 1);
     for (int s = 0; s < 6; s++) m.pixel(tx, 1 + s + wave - bob, stripes[s]);
   }
-  sprite(m, kFly, x, bob, ms);
+  sprite(m, kLogo, x, 0, ms, LW, LH);
 }
 
 uint32_t lastT = 0;

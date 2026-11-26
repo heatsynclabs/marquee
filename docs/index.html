@@ -351,7 +351,7 @@ footer { border-top:2px solid var(--g-line-hi); }
     <h2>Console</h2>
     <div class="field">
       <label for="raw">Raw command JSON</label>
-      <textarea id="raw" spellcheck="false">{"queue":[{"say":"HEATSYNC LABS","color":"amber"},{"anim":"robot","hold":23200}]}</textarea>
+      <textarea id="raw" spellcheck="false">{"queue":[{"say":"HEATSYNC LABS","color":"amber"},{"anim":"robot","hold":23500}]}</textarea>
     </div>
     <div class="row" style="margin-bottom:var(--space-4)">
       <div class="fit"><button class="btn" data-variant="primary" id="raw-send" type="button">Send JSON</button></div>
@@ -1049,7 +1049,7 @@ function wire() {
   buildEffects();
   rotRow("anim", "clock");
   rotRow("say", "HEATSYNC LABS", { color: "#ff9f43" });
-  rotRow("anim", "robot", { hold: 23200 });
+  rotRow("anim", "robot", { hold: 23500 });
   requestAnimationFrame(drawPreview);
   connect();
 }

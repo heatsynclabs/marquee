@@ -70,10 +70,11 @@ the frame would draw more than `power_ma`.
 Built in: `off`, `solid`, `rainbow`, `plasma`, `fire`, `rain`, `sparkle`,
 `comet`, `chase`, `breathe`, `confetti`, `clock`, `robot`.
 
-`robot` is a small character routine: it walks in, waves, hops and walks off,
-then flies across on a jetpack trailing rainbow stripes (the trans flag on
-about one appearance in three). One full routine is 23.2 s, so give it
-`"hold": 23200` in the rotation to let it finish.
+`robot` is a small character routine: the robot walks in, waves, hops and
+walks off, then the HeatSync Labs mark flies past in orange trailing rainbow
+stripes (the trans flag on about one appearance in three), then the robot walks
+again. One full routine is 23.5 s, so give it
+`"hold": 23500` in the rotation to let it finish.
 
 `solid`, `sparkle`, `comet`, `chase` and `breathe` use `color`. `clock` reads
 the time over NTP and shows `HH:MM`, which fills the panel exactly.
