@@ -121,7 +121,7 @@ watches `open`, the same SpaceAPI document the HeatSync Labs website uses for
 its own door indicator. When the lab is closed, nothing extra is shown.
 
     tools/marquee.py status                     what it last saw
-    tools/marquee.py rotate --open "OPEN|COME IN - {until}"       change the frames
+    tools/marquee.py rotate --open "OPEN|COME IN {until}"         change the frames
     tools/marquee.py rotate --open ""                              turn it off
 
 Point it somewhere else with `status_url` and `status_key`; any endpoint
