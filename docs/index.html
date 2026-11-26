@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Marquee Console, HeatSync Labs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=Charis+SIL:wght@700&family=IBM+Plex+Mono:wght@500;600&family=Instrument+Sans:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* ============================================================
+   GANTRY tokens, subset, HeatSync Labs design system
+   ============================================================ */
+:root, :root[data-theme="dark"] {
+  --char:#15120f; --grime:#1d1915; --slab:#26211b; --slab-hi:#2f2920;
+  --steel:#3a342b; --steel-hi:#4a4338;
+  --bone:#ece3d3; --ash:#a79d8c; --smoke:#756c5e;
+  --hazard:#f2ab1e; --hazard-deep:#c98714; --hazard-dim:rgba(242,171,30,0.12);
+  --accent-text:#f2ab1e;
+  --rust:#c2542c; --live:#5fb892; --fault:#d24f3a; --violet:#9b7fd0; --info:#5e93c4;
+  --tape-dark:#14110d; --on-dark:#ece3d3; --on-dark-line:rgba(236,227,211,0.24);
+  --grain-op:0.045; --grain-blend:normal;
+  --shadow:6px 6px 0 #0a0806; --shadow-sm:4px 4px 0 #0a0806;
+  --ink-ok:#7fd0aa; --ink-warn:#f2ab1e; --ink-err:#ef7b68; --ink-info:#8fbde6;
+  --ink-faint:#9c9384;
+}
+:root[data-theme="light"] {
+  --char:#f4efe3; --grime:#ebe3d3; --slab:#faf6ec; --slab-hi:#f0e8d8;
+  --steel:rgba(28,24,18,0.16); --steel-hi:#1c1812;
+  --bone:#1c1812; --ash:#4a4236; --smoke:#6f6555;
+  --hazard:#f2ab1e; --hazard-deep:#b9740f; --hazard-dim:rgba(242,171,30,0.18);
+  --accent-text:#97600c;
+  --rust:#c2542c; --live:#2f8562; --fault:#b8341f; --violet:#6a4fa0; --info:#35648f;
+  --grain-op:0.05; --grain-blend:multiply;
+  --shadow:6px 6px 0 #1c1812; --shadow-sm:4px 4px 0 #1c1812;
+  --ink-ok:#216b4d; --ink-warn:#8a5a09; --ink-err:#a52d1a; --ink-info:#2b5578;
+  --ink-faint:#5f5648;
+}
+:root, [data-ground="page"] {
+  --g-bg:var(--char); --g-raised:var(--slab); --g-line:var(--steel); --g-line-hi:var(--steel-hi);
+  --g-ink:var(--bone); --g-ink-2:var(--ash); --g-ink-3:var(--smoke);
+  --g-accent:var(--hazard); --g-on-accent:var(--accent-text);
+}
+[data-ground="raised"] {
+  --g-bg:var(--slab); --g-raised:var(--slab-hi); --g-line:var(--steel); --g-line-hi:var(--steel-hi);
+  --g-ink:var(--bone); --g-ink-2:var(--ash); --g-ink-3:var(--smoke);
+  --g-accent:var(--hazard); --g-on-accent:var(--accent-text);
+}
+[data-ground="plate"] {
+  --g-bg:var(--tape-dark); --g-raised:#201b16; --g-line:var(--on-dark-line);
+  --g-line-hi:rgba(236,227,211,0.4); --g-ink:var(--on-dark); --g-ink-2:#b3a996; --g-ink-3:#8b8271;
+  --g-accent:var(--hazard); --g-on-accent:#f2ab1e;
+}
+:root {
+  --font-display:'Archivo','Arial Black',sans-serif;
+  --font-body:'Instrument Sans',system-ui,sans-serif;
+  --font-ui:'IBM Plex Mono',ui-monospace,monospace;
+  --font-mono:'JetBrains Mono',ui-monospace,monospace;
+  --font-logo:'Charis SIL',Georgia,serif;
+  --text-xs:clamp(11px,0.70rem + 0.1vw,13px);
+  --text-sm:clamp(13px,0.80rem + 0.15vw,15px);
+  --text-base:clamp(15px,0.90rem + 0.2vw,17px);
+  --text-lg:clamp(17px,1.00rem + 0.25vw,19px);
+  --text-2xl:clamp(21px,1.15rem + 0.9vw,26px);
+  --text-4xl:clamp(29px,1.40rem + 2.6vw,40px);
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:20px;
+  --space-6:24px; --space-8:32px; --space-10:40px; --space-12:48px;
+  --tracking-ui:0.14em; --tracking-eyebrow:0.22em;
+  --bd:1px solid var(--g-line); --bd-2:2px solid var(--g-line-hi);
+  --tap:44px; --maxw:1180px;
+  --safe-l:env(safe-area-inset-left,0px); --safe-r:env(safe-area-inset-right,0px);
+}
+/* ============================================================
+   Base
+   ============================================================ */
+* { box-sizing:border-box; }
+html { -webkit-text-size-adjust:100%; }
+body {
+  margin:0; background:var(--g-bg); color:var(--g-ink);
+  font-family:var(--font-body); font-size:var(--text-base); line-height:1.5;
+  position:relative; min-height:100vh;
+}
+body::after {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:2;
+  opacity:var(--grain-op); mix-blend-mode:var(--grain-blend);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.wrap { width:100%; max-width:var(--maxw); margin-inline:auto;
+  padding-inline:max(var(--space-4),var(--safe-l)); }
+.tape { height:26px; background:repeating-linear-gradient(-45deg,
+  var(--hazard) 0 22px, var(--tape-dark) 22px 44px);
+  border-block:2px solid var(--tape-dark); }
+.eyebrow { font-family:var(--font-ui); font-size:var(--text-xs); font-weight:600;
+  letter-spacing:var(--tracking-eyebrow); text-transform:uppercase; color:var(--g-on-accent);
+  margin:0 0 var(--space-3); }
+.title { font-family:var(--font-display); font-weight:800; text-transform:uppercase;
+  letter-spacing:-0.01em; line-height:0.95; color:var(--g-ink); margin:0; }
+.wordmark { font-family:var(--font-logo); font-weight:700; }
+/* header */
+header { border-bottom:2px solid var(--g-line-hi); background:var(--grime); }
+.head { display:flex; align-items:center; gap:var(--space-4); padding-block:var(--space-4);
+  flex-wrap:wrap; }
+.mark { width:52px; height:52px; flex:none; color:var(--g-ink); }
+.mark svg { width:100%; height:100%; display:block; }
+.head-txt { flex:1 1 auto; min-width:180px; }
+.head-txt .wordmark { font-size:var(--text-lg); display:block; line-height:1.1; }
+.head-txt .title { font-size:var(--text-4xl); }
+.head-tools { display:flex; gap:var(--space-2); align-items:center; }
+/* buttons */
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:var(--space-2);
+  min-height:var(--tap); padding:0 var(--space-5);
+  font-family:var(--font-ui); font-size:var(--text-sm); font-weight:600;
+  letter-spacing:var(--tracking-ui); text-transform:uppercase;
+  border:var(--bd-2); background:transparent; color:var(--g-ink); cursor:pointer;
+  transition:transform .12s ease, box-shadow .12s ease; }
+.btn:hover { transform:translate(-2px,-2px); box-shadow:var(--shadow-sm); }
+.btn:active { transform:none; box-shadow:none; }
+.btn[data-variant="primary"] { background:var(--hazard); color:#14110d; border-color:#14110d;
+  box-shadow:var(--shadow-sm); }
+.btn[data-variant="danger"] { border-color:var(--fault); color:var(--ink-err); }
+.btn[data-size="sm"] { min-height:34px; padding:0 var(--space-3); font-size:var(--text-xs); }
+.btn:disabled { opacity:.45; cursor:not-allowed; transform:none; box-shadow:none; }
+.btn svg { width:15px; height:15px; flex:none; }
+/* cards + fields */
+main { padding-block:var(--space-8) var(--space-12); }
+.grid { display:grid; gap:var(--space-6); grid-template-columns:1fr; align-items:start; }
+@media (min-width:980px) { .grid { grid-template-columns:1.15fr 1fr; } }
+.card { background:var(--g-raised); border:var(--bd-2); padding:var(--space-5);
+  box-shadow:var(--shadow-sm); margin-bottom:var(--space-6); }
+.card > h2 { font-family:var(--font-display); font-weight:800; text-transform:uppercase;
+  font-size:var(--text-2xl); line-height:1; margin:0 0 var(--space-4);
+  display:flex; align-items:center; justify-content:space-between; gap:var(--space-3);
+  flex-wrap:wrap; }
+label, .lbl { display:block; font-family:var(--font-ui); font-size:var(--text-xs);
+  font-weight:600; letter-spacing:var(--tracking-ui); text-transform:uppercase;
+  color:var(--g-ink-2); margin:0 0 var(--space-2); }
+input[type=text], input[type=number], input[type=url], textarea, select {
+  width:100%; font-size:16px; font-family:var(--font-mono);
+  background:var(--g-bg); color:var(--g-ink); border:var(--bd);
+  padding:var(--space-3); min-height:var(--tap); border-radius:0; }
+textarea { min-height:84px; resize:vertical; line-height:1.4; }
+input:focus-visible, textarea:focus-visible, select:focus-visible, .btn:focus-visible,
+.sw:focus-visible, summary:focus-visible { outline:2px solid var(--hazard); outline-offset:2px; }
+.row { display:flex; gap:var(--space-3); flex-wrap:wrap; align-items:flex-end; }
+.row > * { flex:1 1 130px; min-width:0; }
+.row > .fit { flex:0 0 auto; }
+.field { margin-bottom:var(--space-4); }
+.hint { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--g-ink-3);
+  margin:var(--space-2) 0 0; line-height:1.45; }
+.check { display:flex; align-items:center; gap:var(--space-2); min-height:var(--tap);
+  font-family:var(--font-ui); font-size:var(--text-xs); font-weight:600;
+  letter-spacing:var(--tracking-ui); text-transform:uppercase; color:var(--g-ink-2);
+  cursor:pointer; }
+.check input { width:20px; height:20px; accent-color:var(--hazard); flex:none; }
+input[type=range] { width:100%; accent-color:var(--hazard); min-height:34px; }
+/* status */
+.dot { width:10px; height:10px; border-radius:9999px; display:inline-block; flex:none;
+  background:var(--smoke); }
+.dot[data-state="on"] { background:var(--live); }
+.dot[data-state="warn"] { background:var(--hazard); }
+.dot[data-state="off"] { background:var(--fault); }
+.links { display:flex; gap:var(--space-4); flex-wrap:wrap; margin-top:var(--space-4);
+  font-family:var(--font-ui); font-size:var(--text-xs); font-weight:600;
+  letter-spacing:var(--tracking-ui); text-transform:uppercase; color:var(--g-ink-2); }
+.links span { display:flex; align-items:center; gap:var(--space-2); }
+.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr));
+  gap:var(--space-3); margin-top:var(--space-4); }
+.stat { border:var(--bd); padding:var(--space-3); background:var(--g-bg); }
+.stat b { display:block; font-family:var(--font-mono); font-size:var(--text-lg);
+  font-weight:600; color:var(--g-ink); }
+.stat span { font-family:var(--font-ui); font-size:10px; letter-spacing:var(--tracking-ui);
+  text-transform:uppercase; color:var(--g-ink-3); }
+.note { border-left:4px solid var(--hazard); background:var(--hazard-dim);
+  padding:var(--space-3); font-family:var(--font-mono); font-size:var(--text-xs);
+  color:var(--g-ink); margin-top:var(--space-4); line-height:1.5; }
+.note[hidden] { display:none; }
+/* colour swatches */
+.swatches { display:grid; grid-template-columns:repeat(auto-fit,minmax(56px,1fr));
+  gap:var(--space-2); }
+.sw { height:38px; border:2px solid var(--g-line); cursor:pointer; position:relative;
+  padding:0; font-family:var(--font-ui); font-size:9px; letter-spacing:.06em;
+  text-transform:uppercase; color:#14110d; display:flex; align-items:flex-end;
+  justify-content:center; padding-bottom:2px; overflow:hidden; }
+.sw[aria-pressed="true"] { border-color:var(--hazard); box-shadow:inset 0 0 0 2px var(--tape-dark); }
+.sw.rain { background:linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f); }
+/* effects */
+.fx { display:grid; grid-template-columns:repeat(auto-fit,minmax(104px,1fr)); gap:var(--space-2); }
+.fx .btn { padding:0 var(--space-2); }
+/* preview */
+.preview { border:var(--bd-2); background:var(--tape-dark); padding:var(--space-3);
+  display:block; width:100%; }
+canvas { display:block; width:100%; height:auto; image-rendering:pixelated; }
+/* rotation rows */
+.rot-row { display:flex; gap:var(--space-2); margin-bottom:var(--space-2); align-items:center; }
+.rot-row select { flex:0 0 108px; min-height:38px; padding:var(--space-2); }
+.rot-row input { flex:1 1 auto; min-height:38px; padding:var(--space-2); }
+.rot-row .btn { flex:0 0 auto; min-height:38px; padding:0 var(--space-3); }
+/* anim list */
+.anim-row { display:flex; gap:var(--space-2); align-items:center; padding:var(--space-2) 0;
+  border-bottom:var(--bd); font-family:var(--font-mono); font-size:var(--text-sm); }
+.anim-row span { flex:1 1 auto; word-break:break-all; }
+/* log */
+#log { height:230px; overflow:auto; background:var(--tape-dark); border:var(--bd);
+  padding:var(--space-3); font-family:var(--font-mono); font-size:12px; line-height:1.55;
+  color:#b3a996; }
+#log div { white-space:pre-wrap; word-break:break-word; }
+#log .tx { color:var(--hazard); }
+#log .rx { color:var(--ink-ok); }
+#log .er { color:var(--ink-err); }
+#log .t { color:#6a6255; }
+details summary { font-family:var(--font-ui); font-size:var(--text-xs); font-weight:600;
+  letter-spacing:var(--tracking-ui); text-transform:uppercase; color:var(--g-ink-2);
+  cursor:pointer; min-height:34px; display:flex; align-items:center; }
+table.kv { width:100%; border-collapse:collapse; font-family:var(--font-mono);
+  font-size:12px; margin-top:var(--space-2); }
+table.kv td { border-bottom:var(--bd); padding:4px 6px; vertical-align:top; }
+table.kv td:first-child { color:var(--g-ink-3); white-space:nowrap; width:1%; }
+footer { border-top:2px solid var(--g-line-hi); }
+.foot { display:flex; gap:var(--space-4); justify-content:space-between; flex-wrap:wrap;
+  padding-block:var(--space-6); font-family:var(--font-mono); font-size:var(--text-xs);
+  color:var(--g-ink-3); }
+@media (prefers-reduced-motion:reduce) {
+  *,*::before,*::after { animation-duration:.01ms !important; transition-duration:.01ms !important; }
+}
+::selection { background:var(--hazard); color:var(--tape-dark); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap head">
+    <div class="mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-label="HeatSync Labs"><g transform="translate(-26,-4) scale(1)"><path fill="#F99A1C" fill-rule="evenodd" d="M418 164c-46.8 2.8 -99.7 19.6 -142.5 45.2 -9.7 5.8 -9.5 5.5 -11.8 17.5l-0.6 3.1 11.4 -5.3c14.4 -6.8 30.5 -12.7 41.8 -15.4 4.9 -1.2 9.1 -2.1 9.4 -2.1 0.3 0 -0.3 1.2 -1.3 2.7 -39.6 59.4 -55.8 104.1 -57.1 157.5 -0.5 19.6 -0.6 19.8 -2.7 19.8 -3.1 0 -12.3 -2.8 -17.1 -5.2 -17.9 -9.1 -48.4 -31.7 -70 -52.1l-7 -6.6 2.4 -4.3c2.8 -5 15.5 -23.1 23.6 -33.5l5.7 -7.2 -1.6 -5.6 -1.7 -5.5 -2.7 3.2c-4.4 5.1 -14.3 18.5 -19.9 26.8 -40.1 60 -57.9 120.2 -56 190 1.6 60.9 17.8 113.3 50.2 162.5 49.5 75.2 136.8 125.7 228.8 132.6l14.9 1.1 3.6 -2.6c13.4 -9.2 31.6 -10.8 45.7 -4l5 2.4 11.1 -2.7 11.2 -2.7 -0.5 -7.6c-0.4 -5.7 -0.1 -9 1.1 -12.8 1.9 -5.6 8.5 -13.8 12.5 -15.4l2.6 -1.1 -2.5 -0.7c-8 -2.3 -41.3 -18.5 -54.7 -26.6 -47.2 -28.3 -80.7 -59.7 -122.3 -114.3l-2.6 -3.3 -6.7 4.1c-12.8 7.8 -32.5 17.1 -36.3 17.1 -3.4 0 -7.7 -4.5 -11 -11.4 -9.3 -19.5 -14.2 -60.3 -13.1 -108.1 0.8 -33.3 3.4 -52.9 9.3 -71.5 3 -9.6 4.7 -12 8.5 -12 3.1 0 5.3 1.7 19.4 15 31.2 29.3 80 54.6 121.9 63.1 7.7 1.5 10.7 2.6 12.6 4.5l2.5 2.5 -2.9 5.2c-3.8 6.9 -18.2 25.7 -30.1 39.3 -5.2 6 -9.5 11.4 -9.5 12 0 0.5 2.1 4.1 4.6 8 17 25.4 50.1 58.2 80.7 79.9 30.6 21.6 67.1 39.6 102.5 50.4 17.4 5.4 18.4 5.3 13.8 -0.1 -10 -11.7 -10.2 -23.9 -0.4 -28.7 3.7 -1.8 6.2 -2.1 15.9 -2.1 22.9 0.1 38.9 6.4 46.6 18.5 1.5 2.5 3.4 4.5 4.2 4.5 2 0 9.1 -7.6 12.5 -13.3l2.7 -4.8 -2.6 -6.7c-3.4 -8.7 -7.2 -14 -11.5 -16.4 -3 -1.7 -4.7 -1.9 -12.6 -1.3 -9.2 0.6 -9.2 0.6 -11.4 -2.2 -1.9 -2.5 -2.1 -3.6 -1.6 -8.9 0.7 -7.2 3.4 -15.4 7.2 -22.4 3.8 -7 14 -16.5 21.6 -20 12.6 -5.8 33.9 -6.3 49.2 -1 3.3 1.1 6.5 2 7.1 2 0.7 0 2.9 -4.6 4.9 -10.2 3.6 -10.5 9 -29.8 8.4 -30.2 -0.2 -0.2 -4.4 -0.8 -9.3 -1.4 -12.9 -1.7 -23.7 -4.7 -33.5 -9.4 -11.3 -5.4 -23.6 -17.4 -26.9 -26.2 -3.1 -8.4 -2.8 -12.4 1.8 -21 2.7 -5.1 4.8 -11.4 7.1 -21.2 2.6 -11.1 3.8 -14.4 5.9 -16.5 2.8 -2.8 10.1 -4.9 17 -4.9 3.1 0 5.1 -1 10.2 -5.1 3.5 -2.8 7.6 -5.7 9.1 -6.5 2.7 -1.4 18.1 -4.4 22.8 -4.4 4.4 0 4.4 1.1 -0.1 -18.7l-2.1 -9.2 -10.3 0.6c-8.7 0.5 -11.3 0.3 -17.3 -1.6 -13.6 -4.1 -23.4 -13.1 -28.1 -25.6 -2.3 -6.2 -2.9 -20.5 -1 -28.3 0.9 -4.2 0.8 -4.6 -2.5 -8.3 -4.4 -4.8 -7.4 -10.5 -8.2 -15.9 -0.7 -4.5 0.3 -6 3.9 -6 3 0 22.8 -8.1 23.3 -9.5 0.7 -1.7 -6.1 -14.3 -9.7 -18.1 -2.9 -3 -3.3 -3.1 -7.2 -2.2 -10.6 2.5 -25.5 -2.4 -34.1 -11.1l-4.6 -4.7 5.2 -1.4c6.7 -1.6 19.8 -7.6 19.8 -8.9 0 -1.5 -14.5 -16.5 -19.1 -19.7 -4 -2.8 -4.7 -2.9 -15.3 -2.9 -10.5 0 -11.5 -0.2 -17.8 -3.3 -4.2 -2 -7.9 -4.7 -9.8 -7.2 -3.5 -4.4 -7 -13.7 -7 -18.5 0 -1.8 -0.8 -3.9 -1.8 -4.8 -3.5 -3.2 -33 -16.7 -48.3 -22.1 -42.6 -15.1 -83.1 -21.1 -124.9 -18.6z"/><path fill="currentColor" fill-rule="evenodd" d="M508.2 6c-19.5 5.1 -32.2 17.8 -48.7 48.6 -7.3 13.5 -10.7 18.5 -18.3 26.9 -8.8 9.5 -11.5 15 -11.6 23 0 4.5 0.6 7.4 2.6 11.7 1.5 3.2 3.1 5.8 3.5 5.8 0.4 0 2.9 -4.5 5.5 -9.9 7.8 -16.5 17 -23.3 36.4 -27.2 12 -2.4 16.3 -4.1 20.9 -8.6 5.4 -5.3 7.5 -10.3 9 -22.3 2.3 -17.1 8.2 -29.9 19.7 -42.5 3.2 -3.4 5.4 -6.5 5.1 -6.9 -1.4 -1.3 -17.1 -0.4 -24.1 1.4z M649 36.1c-4.4 1.8 -9 5.9 -11.2 10.2 -1.8 3.4 -2.3 5.8 -2.3 12.7 0 7.5 0.4 9.2 3 14.4 3.7 7.3 7.3 10.3 10.4 8.7 2 -1.1 2.1 -1.9 2.1 -15.9 0 -13 1 -24.1 2.6 -29.5 0.6 -1.9 -0.8 -2.1 -4.6 -0.6z M567.5 48.7c-9.8 1.3 -20.4 6.5 -28.5 13.9 -13 12.1 -16.8 28.4 -12.1 51.5 1.1 5.2 2.3 12.2 2.6 15.6 0.8 6.4 0 17.9 -1.3 20.1 -0.6 0.9 -3.2 0.6 -10.7 -1l-10 -2.2 0 -6.1c0 -7.3 -3.1 -13.2 -11.1 -21.1 -7.3 -7.3 -10 -16.4 -7.3 -24.3 0.6 -1.8 0.9 -3.5 0.5 -3.8 -1.3 -1.3 -10.8 4.3 -15 8.7 -6 6.4 -8 12.1 -7.4 21.4 0.5 8.3 3.4 14.4 9 19.2 3 2.5 3.1 2.7 0.8 2 -1.4 -0.4 -15 -1 -30.2 -1.3l-27.8 -0.6 0 -4.7c0 -6.1 -3.2 -16.4 -6.5 -21.3 -3.7 -5.3 -10 -9.7 -14.2 -9.7 -3 0 -3.6 0.5 -5.2 4.2 -2.2 5.1 -4.5 7.2 -12.8 12.2 -10.7 6.3 -15.4 14 -15.6 25.4l-0.2 6.7 -5.1 0.9c-5.1 0.8 -5.2 0.8 -10.5 -3.4 -16.5 -13.1 -36.8 -16.2 -59.2 -9 -31.7 10.2 -64.5 46.5 -82.6 91.5 -2.7 6.7 -4.7 9.7 -12.7 18.5 -56.6 62.6 -87.3 137.4 -90.1 219.5 -1.7 52.3 7.9 103.7 27.3 145.4 2.4 5.2 4.3 9.6 4.1 9.8 -0.2 0.2 -2.1 -1 -4.2 -2.7 -7 -5.6 -14.2 -8.4 -21.4 -8.4 -8.4 0 -10.6 1.1 -21.9 11.8 -5 4.6 -11.6 10.1 -14.9 12.2 -3.2 2.1 -5.8 4.3 -5.8 4.9 0 1.9 10.1 6.4 19 8.5 9.9 2.4 18.2 5.7 23.2 9.6 12.2 9.3 25.3 9.7 38.5 1.2 2.7 -1.7 5 -2.9 5.2 -2.7 0.2 0.2 3.1 4.6 6.5 9.6 7.8 11.8 19.4 26.2 30.5 38l8.7 9.2 -5.3 5.4c-10.7 10.9 -13.6 20.6 -10.4 34.7 3.7 16.1 1.6 30.8 -6 42.7 -1.9 3.1 -3.4 5.6 -3.2 5.7 1.2 0.9 14.7 2.6 20 2.6 8 0 20.2 -3 27.1 -6.7 8.5 -4.5 17.7 -14.5 22.6 -24.4 2.3 -4.7 4.5 -10.4 4.8 -12.7 0.3 -2.3 0.8 -4.2 1.2 -4.2 0.3 0 5.6 3 11.7 6.7l11.2 6.7 -3.4 4c-1.9 2.2 -4.6 6.5 -6.1 9.6 -2.4 4.9 -2.7 7.2 -3.4 21 -0.4 8.5 -1.2 18.4 -1.9 22 -2.6 15.2 -8.6 28.4 -17.6 39.4 -3.1 3.7 -5.4 6.9 -5.1 7.2 0.3 0.3 4 1.1 8.2 1.7 9.4 1.3 27.4 -0.3 38.5 -3.4 5.7 -1.6 20.2 -7.7 25 -10.6 0.3 -0.2 0.5 1.3 0.5 3.3 0 7.6 5.1 6.8 16.2 -2.5 12.3 -10.1 24.9 -30.5 30.8 -49.4 1.5 -4.8 3.2 -8.7 3.9 -8.6 0.6 0 4.3 0.6 8.1 1.3 5.1 0.9 6.9 1.6 6.8 2.6 -0.2 0.8 -1 4.9 -1.9 9 -2 9.8 -1.3 20.4 2 27.6 3.1 6.8 9.9 14.1 20.2 21.5 16.7 12.1 25 24.2 26.1 38.2 0.8 10 -1.2 16 -9.4 28.7 -7.2 11.3 -9.6 17.8 -8.4 23.2 1.8 7.8 4.8 10.3 17.1 14.2 10.4 3.4 15.6 6.3 20.3 11.5 4.3 4.8 5.2 7.6 4.4 14.2 -0.5 3.7 -0.3 4.9 0.7 4.9 3.4 0 15.8 -11.7 19.1 -18 3.1 -6 3.1 -13.7 0 -23 -4.9 -14.6 -2.7 -19.9 13.3 -32.8 11.8 -9.6 15.7 -13.9 18.9 -20.9 5.9 -12.9 4 -22.2 -7.7 -37.8 -12.2 -16.3 -13.7 -25.3 -7 -42.2 1.7 -4.3 3.4 -10.5 3.7 -13.8l0.5 -6 12.5 -3.1 12.5 -3 7.2 7c9.1 8.9 21.4 15.5 41.6 22.1 8 2.6 17.9 6.1 22 7.7 14.4 5.7 28 16.9 33.3 27.5 3 5.8 5.7 15.6 5.7 20.6 0 2 0.5 3.9 1.1 4.3 1.8 1.1 9.1 -5 14.7 -12.2 16.4 -21.5 23.5 -50.5 18 -73.4 -3.1 -12.6 -13.3 -27 -25.7 -36 -3.3 -2.4 -5.9 -4.6 -5.6 -4.8 0.2 -0.2 3.4 0.8 7.2 2.3 15.8 6.4 35.8 4.7 51.1 -4.1 2.6 -1.5 8.6 -6.6 13.3 -11.4 9.7 -9.7 9.3 -9.6 16.2 -3.1 6.3 5.9 8.2 10.4 8.2 19.6 0 6.2 -0.6 9.2 -2.4 13.2 -2.8 6.4 -10 13.3 -17.5 17 -3.1 1.5 -5.6 3 -5.6 3.4 0 2.4 20.8 2.7 29.5 0.4 16.4 -4.4 27.9 -17 30.6 -33.5 1.8 -10.9 -1.3 -23.5 -8.1 -33.8 -3.6 -5.3 -14 -16.1 -20.2 -20.8 -2.6 -2 -2.7 -2.4 -1.9 -7.4 0.9 -5.9 -0.2 -19.6 -2.3 -27.7 -1.4 -5.4 -1.4 -5.7 1 -9.5l2.5 -3.9 2.7 2.1c1.5 1.2 9.9 9.2 18.7 17.9 13.8 13.6 17.1 16.3 23.8 19.6 6.5 3.2 9.1 3.9 15.7 4.3 11.6 0.7 12.1 0.2 6.1 -5.8 -10.3 -10.3 -13.4 -29.1 -7.5 -46.7 2.2 -6.5 5.5 -12.3 7 -12.3 2.5 0 8 5.9 10.6 11.2 1.4 2.9 3.8 9.7 5.2 15.2 3.7 14 7.6 21.6 15.1 29.2 4.5 4.6 8.4 7.4 14.1 10.1 7.5 3.6 8.4 3.8 17.9 3.8 11.2 0 15.1 -1.4 22.5 -8.1 3.9 -3.6 8 -10.6 8 -13.8 0 -1.6 -0.3 -1.6 -3.6 0.4 -2.8 1.8 -4.6 2.1 -8.5 1.8 -9.5 -0.9 -12.4 -6.5 -13.9 -25.9 -0.5 -7.4 -1.6 -16 -2.4 -19.1 -6.3 -23.7 -20.8 -40.1 -42.6 -48.4 -7 -2.6 -8.5 -2.8 -21.5 -2.8 -12.7 0.1 -18.5 0.8 -30.5 3.9 -2.5 0.6 -2.5 0.5 4 -19.2 3.6 -10.9 7.4 -23.5 8.4 -27.8 1.1 -4.4 2.2 -8.3 2.6 -8.7 0.3 -0.5 4.4 0.8 9 2.6 9.9 4 17.7 6.3 18.6 5.4 0.3 -0.4 0.1 -2.9 -0.5 -5.5 -0.6 -2.6 -1.3 -6.9 -1.7 -9.4l-0.6 -4.5 15.5 -3.8c8.5 -2 16.8 -4.5 18.5 -5.4 1.8 -0.9 4.5 -3.8 6.1 -6.4 3.5 -5.4 5.9 -6.9 15.8 -9.3 8 -1.9 16.8 -6.7 22.6 -12.3 11.5 -11.1 26.2 -42.5 31.2 -66.7 2.3 -11.1 3.1 -28.9 1.5 -36.7 -1.2 -6.3 -3.4 -11.8 -4.8 -11.8 -0.4 0 -2 4.1 -3.6 9.2 -3.9 12 -9.6 23.7 -14.1 28.7 -10.2 11.3 -32.7 14.7 -66.6 10.2 -7.9 -1.1 -20.5 -2.5 -28 -3.2l-13.6 -1.2 -1.2 -9.3c-0.7 -5 -2.3 -13.6 -3.7 -18.9 -1.3 -5.4 -2.3 -9.9 -2.2 -10 0.2 -0.1 3.2 -2.1 6.8 -4.5 15.4 -10.4 31.7 -29.2 41.3 -47.9 15 -29 19.1 -57.2 18.5 -127.1 -0.3 -31.4 -0.2 -32.8 2 -40.5 3.2 -10.9 8.6 -20.8 15.4 -28.1 9.4 -10.1 26.5 -20.8 41.1 -25.9 4.3 -1.6 8 -3.1 8.2 -3.6 0.3 -0.4 -1.8 -1.4 -4.7 -2.3 -38.6 -11.2 -84.1 -0.5 -108 25.3 -10.3 11 -16.1 22.8 -19.6 39.1 -2.7 12.6 -3.4 14.2 -8.6 19.8 -6.4 6.8 -9.2 13.2 -12.1 27.3 -1.4 6.8 -2.5 12.7 -2.5 13 0 0.4 -1.7 3.1 -3.7 6 -3.2 4.5 -3.8 6.2 -3.6 10.1l0.1 4.8 -4.7 0c-6.2 0 -13.1 3.5 -20.8 10.5l-6.1 5.5 -2.6 -4c-3 -4.5 -3.2 -6.2 -1.1 -8 2.1 -1.7 4.8 -11.6 4.1 -14.6 -0.8 -3.2 -4.5 -4 -10.3 -2 -8.9 3 -10 2.6 -19.9 -7.4 -4.9 -5 -10.3 -10 -12.1 -11.3 -1.8 -1.2 -3.3 -2.5 -3.3 -2.8 0 -0.7 13.1 -6.8 23.3 -10.9 23.8 -9.3 34 -18.8 40.3 -37.5 2.5 -7.3 2.8 -9.4 2.8 -23 0.1 -16.6 -0.9 -21.7 -7.1 -38 -9.1 -24 -12.3 -44.4 -9 -58.3 0.8 -3.4 1.1 -6.2 0.7 -6.2 -1.4 0 -8.6 5.7 -11.9 9.5 -6.1 7 -14.7 21.1 -22 35.9 -7.4 15.2 -16.8 31.6 -23.1 40.1 -5.6 7.6 -12.5 13.5 -26.1 22.5 -14.8 9.8 -18.9 12.9 -25 18.8l-4.7 4.4 -3.6 -1.7c-2 -1 -3.6 -2.2 -3.6 -2.7 0 -0.5 1 -4.6 2.2 -9.1 1.6 -6 2.2 -11.2 2.2 -19.7 0.1 -11.2 0 -11.7 -3.6 -19.1 -2.9 -6.3 -5.4 -9.5 -13.6 -17.6 -13.3 -13.2 -15.7 -17.7 -15.7 -29.8 0 -11 2 -15.7 10.7 -24.4l5.9 -5.8 -3.2 -0.7c-3.3 -0.6 -11.2 -0.6 -16.4 0.1zm-240.2 113.9c2 0.4 3.7 0.9 3.7 1.3 0 0.3 -4.4 2.1 -9.8 4 -10.4 3.6 -34.3 14.6 -39.1 18 -4.6 3.3 -4.5 2.5 1 -4.4 8.1 -10.4 16.4 -16.4 25.3 -18.6 4 -0.9 14 -1.1 18.9 -0.3zm144.7 3c24.5 3 45.7 8.1 70.9 17 15.3 5.4 44.8 18.9 48.3 22.1 1 0.9 1.8 3 1.8 4.8 0 4.8 3.5 14.1 7 18.5 1.9 2.5 5.6 5.2 9.8 7.2 6.3 3.1 7.3 3.3 17.8 3.3 10.6 0 11.3 0.1 15.3 2.9 4.6 3.2 19.1 18.2 19.1 19.7 0 1.3 -13.1 7.3 -19.8 8.9l-5.2 1.4 4.6 4.7c8.6 8.7 23.5 13.6 34.1 11.1 3.9 -0.9 4.3 -0.8 7.2 2.2 3.6 3.8 10.4 16.4 9.7 18.1 -0.5 1.4 -20.3 9.5 -23.3 9.5 -3.6 0 -4.6 1.5 -3.9 6 0.8 5.4 3.8 11.1 8.2 15.9 3.3 3.7 3.4 4.1 2.5 8.3 -1.9 7.8 -1.3 22.1 1 28.3 4.7 12.5 14.5 21.5 28.1 25.6 6 1.9 8.6 2.1 17.3 1.6l10.3 -0.6 2.1 9.2c4.5 19.8 4.5 18.7 0.1 18.7 -4.7 0 -20.1 3 -22.8 4.4 -1.5 0.8 -5.6 3.7 -9.1 6.5 -5.1 4.1 -7.1 5.1 -10.2 5.1 -6.9 0 -14.2 2.1 -17 4.9 -2.1 2.1 -3.3 5.4 -5.9 16.5 -2.3 9.8 -4.4 16.1 -7.1 21.2 -4.6 8.6 -4.9 12.6 -1.8 21 3.3 8.8 15.6 20.8 26.9 26.2 9.8 4.7 20.6 7.7 33.5 9.4 4.9 0.6 9.1 1.2 9.3 1.4 0.6 0.4 -4.8 19.7 -8.4 30.2 -2 5.6 -4.2 10.2 -4.9 10.2 -0.6 0 -3.8 -0.9 -7.1 -2 -15.3 -5.3 -36.6 -4.8 -49.2 1 -7.6 3.5 -17.8 13 -21.6 20 -3.8 7 -6.5 15.2 -7.2 22.4 -0.5 5.3 -0.3 6.4 1.6 8.9 2.2 2.8 2.2 2.8 11.4 2.2 7.9 -0.6 9.6 -0.4 12.6 1.3 4.3 2.4 8.1 7.7 11.5 16.4l2.6 6.7 -2.7 4.8c-3.4 5.7 -10.5 13.3 -12.5 13.3 -0.8 0 -2.7 -2 -4.2 -4.5 -7.7 -12.1 -23.7 -18.4 -46.6 -18.5 -9.7 0 -12.2 0.3 -15.9 2.1 -9.8 4.8 -9.6 17 0.4 28.7 4.6 5.4 3.6 5.5 -13.8 0.1 -35.4 -10.8 -71.9 -28.8 -102.5 -50.4 -30.6 -21.7 -63.7 -54.5 -80.7 -79.9 -2.5 -3.9 -4.6 -7.5 -4.6 -8 0 -0.6 4.3 -6 9.5 -12 11.9 -13.6 26.3 -32.4 30.1 -39.3l2.9 -5.2 -2.5 -2.5c-1.9 -1.9 -4.9 -3 -12.6 -4.5 -41.9 -8.5 -90.7 -33.8 -121.9 -63.1 -14.1 -13.3 -16.3 -15 -19.4 -15 -3.8 0 -5.5 2.4 -8.5 12 -5.9 18.6 -8.5 38.2 -9.3 71.5 -1.1 47.8 3.8 88.6 13.1 108.1 3.3 6.9 7.6 11.4 11 11.4 3.8 0 23.5 -9.3 36.3 -17.1l6.7 -4.1 2.6 3.3c41.6 54.6 75.1 86 122.3 114.3 13.4 8.1 46.7 24.3 54.7 26.6l2.5 0.7 -2.6 1.1c-4 1.6 -10.6 9.8 -12.5 15.4 -1.2 3.8 -1.5 7.1 -1.1 12.8l0.5 7.6 -11.2 2.7 -11.1 2.7 -5 -2.4c-14.1 -6.8 -32.3 -5.2 -45.7 4l-3.6 2.6 -14.9 -1.1c-66.3 -5 -130.4 -32.4 -181.6 -77.9 -45.6 -40.4 -78.7 -98.9 -91.2 -160.7 -4.1 -20.2 -5.6 -34 -6.2 -56.5 -1.9 -69.8 15.9 -130 56 -190 5.6 -8.3 15.5 -21.7 19.9 -26.8l2.7 -3.2 1.7 5.5 1.6 5.6 -5.7 7.2c-8.1 10.4 -20.8 28.5 -23.6 33.5l-2.4 4.3 7 6.6c21.6 20.4 52.1 43 70 52.1 4.8 2.4 14 5.2 17.1 5.2 2.1 0 2.2 -0.2 2.7 -19.8 1.3 -53.4 17.5 -98.1 57.1 -157.5 1 -1.5 1.6 -2.7 1.3 -2.7 -0.3 0 -4.5 0.9 -9.4 2.1 -11.3 2.7 -27.4 8.6 -41.8 15.4l-11.4 5.3 0.6 -3.1c2.3 -12 2.1 -11.7 11.8 -17.5 27.1 -16.2 62.1 -30.4 93.3 -37.8 33.4 -7.9 69.1 -9.9 103.2 -5.8zm233.7 529.1c-2.9 4.5 -6.9 8.3 -11.7 11.2 -4.8 2.9 -5.8 2.6 -2.1 -0.5 1.7 -1.4 5.9 -5.5 9.3 -9 3.4 -3.5 6.3 -6.2 6.5 -6 0.3 0.2 -0.7 2.1 -2 4.3zm-390.9 100.2c1 0.5 -0.4 2.3 -4.8 6.5 -3.4 3.1 -6.4 5.5 -6.7 5.2 -0.4 -0.4 -3.2 -14.8 -3.3 -16.8 0 -0.7 11.8 3.4 14.8 5.1z M311.3 92.7c-0.7 0.2 -1.3 2.1 -1.3 4.1 0 4.3 8.3 30.5 9.8 31 1.3 0.4 7.3 -7.1 10.2 -12.8 1.4 -2.6 2.4 -6.4 2.4 -9.2 0.1 -3.9 -0.4 -5.2 -2.9 -7.8 -4 -4.2 -13.9 -7.1 -18.2 -5.3z M907 199.4c-21.9 5.6 -39.5 22.4 -42.9 41.1 -0.6 3.2 -1.1 13.1 -1.1 21.9 0 22.8 -2.4 31.2 -11.9 43.1 -3.9 4.8 -4 5 -1.8 5.5 4.3 1.1 16 -1 22.4 -4.1 16 -7.6 25.5 -22.1 29.8 -45.4 2.8 -15.3 3.7 -18.3 8 -25.1 7.5 -11.7 19.5 -18.2 40.8 -21.8 2 -0.4 3.7 -1.1 3.7 -1.6 0 -1.5 -11.8 -9.1 -18.4 -11.7 -7.6 -3.1 -20.4 -4 -28.6 -1.9z M977.6 221.5c-16 4.1 -29.3 14.5 -36.6 28.8 -2.3 4.7 -4.4 10.4 -4.7 13 -0.5 4.2 -0.3 4.9 2.6 7.8 3.1 3.1 3.4 3.1 9.9 2.7 12.4 -0.9 21.9 -7.7 34 -24.3 2.8 -3.9 6.5 -8.4 8.4 -10.2 4.7 -4.5 14.3 -10.1 20.8 -12 3 -0.9 5.9 -2 6.4 -2.4 0.5 -0.4 -1.6 -1.5 -4.5 -2.4 -7.5 -2.4 -28.4 -2.9 -36.3 -1z M869.3 557c-5.7 1.2 -9.6 3.4 -12.8 7.2 -2.3 2.7 -2.6 3.9 -2.2 7.5 1.2 10.8 13.6 26.7 25.4 32.5 5.7 2.8 7.7 3.2 13.7 3.2 11.8 -0.1 23 -6.6 31.1 -17.8 3.5 -4.9 8.5 -14.4 8.5 -16.1 0 -0.1 -2.9 0 -6.4 0.2 -8.1 0.7 -14 -1.2 -26.6 -8.4 -5.2 -3 -11 -6.1 -12.8 -6.9 -4.5 -1.9 -12.6 -2.5 -17.9 -1.4z M149.8 693.7c-2.8 3.2 -3.9 9.5 -3.6 20.8 0.3 10.9 0.3 11 2.8 11.3 3.3 0.3 8.5 -3 11.1 -7 4 -6.4 1.3 -18.6 -5.4 -24.9 -2.5 -2.3 -3 -2.4 -4.9 -0.2z M100.9 699.4c-12.6 3.6 -27.1 15.9 -32.6 27.6 -11.6 24.5 -12.7 26.5 -17.1 30.9 -2.6 2.6 -7.5 6.4 -11 8.6 -3.4 2.1 -5.9 4.2 -5.4 4.7 0.4 0.4 5.3 1.9 10.8 3.3 22.3 5.6 48.6 1.8 65.9 -9.5 15.8 -10.3 24.4 -25.2 24.8 -42.9 0.2 -10.2 -2.6 -16.2 -9.7 -20.5 -4.1 -2.5 -5.9 -3 -12.9 -3.3 -4.7 -0.1 -10.2 0.3 -12.8 1.1z M139 798c-6 6 2.5 13.9 13 12 4.9 -0.9 10.2 -5.5 9.8 -8.5 -0.7 -4.6 -18.8 -7.5 -22.8 -3.5z M288.5 896.1c-4.4 1 -13.5 4.9 -13.5 5.8 0 0.3 3.2 2.1 7 4 5.8 2.7 8.5 5 15.3 12.4 18.9 20.8 22.2 23.1 33.2 23.1 8.2 0 13.4 -2.3 18.3 -7.9 2.7 -3 3.2 -4.4 3.2 -8.6 0 -6.5 -2.2 -11 -7.6 -15.8 -10.5 -9.2 -25.2 -14.2 -41.8 -14 -5.6 0.1 -11.9 0.5 -14.1 1z"/></g></svg></div>
+    <div class="head-txt">
+      <span class="wordmark">HeatSync Labs</span>
+      <h1 class="title">Marquee Console</h1>
+    </div>
+    <div class="head-tools">
+      <button class="btn" data-size="sm" id="theme" type="button" aria-label="Switch theme">Theme</button>
+    </div>
+  </div>
+</header>
+<div class="tape" role="presentation"></div>
+
+<main class="wrap">
+<div class="grid">
+
+<!-- ================= left column ================= -->
+<div>
+
+  <section class="card">
+    <h2>Link</h2>
+    <div class="row">
+      <div style="flex:2 1 220px">
+        <label for="host">Panel host</label>
+        <input type="text" id="host" value="marquee.local" spellcheck="false" autocapitalize="off">
+      </div>
+      <div class="fit"><button class="btn" data-variant="primary" id="connect" type="button">Connect</button></div>
+    </div>
+    <div class="links">
+      <span><i class="dot" id="d-ws"></i> Socket</span>
+      <span><i class="dot" id="d-http"></i> HTTP</span>
+      <span><i class="dot" id="d-lab"></i> Lab open</span>
+      <span id="showing" style="color:var(--g-ink)"></span>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="note" id="cors-note" hidden></div>
+    <details style="margin-top:var(--space-4)">
+      <summary>Raw state</summary>
+      <table class="kv" id="state-kv"></table>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>Message</h2>
+    <div class="field">
+      <label for="msg">Text, 127 characters max</label>
+      <textarea id="msg" maxlength="127" spellcheck="false">LAB OPEN</textarea>
+      <p class="hint"><span id="count">8</span>/127. Ctrl plus Enter sends.</p>
+    </div>
+
+    <div class="field">
+      <span class="lbl">Colour</span>
+      <div class="swatches" id="swatches"></div>
+      <div class="row" style="margin-top:var(--space-3)">
+        <div>
+          <label for="hex">Custom hex</label>
+          <input type="text" id="hex" placeholder="#ff0044" spellcheck="false">
+        </div>
+        <label class="check fit"><input type="checkbox" id="rainbow"> Rainbow by column</label>
+      </div>
+    </div>
+
+    <div class="row field">
+      <div>
+        <label for="speed">Speed, px per second</label>
+        <input type="number" id="speed" value="20" min="1" max="200">
+      </div>
+      <div>
+        <label for="repeat">Repeat, -1 forever</label>
+        <input type="number" id="repeat" value="1" min="-1" max="99">
+      </div>
+      <div>
+        <label for="hold">Hold, ms</label>
+        <input type="number" id="hold" value="" min="0" step="100" placeholder="auto">
+      </div>
+    </div>
+
+    <div class="row field">
+      <label class="check fit"><input type="checkbox" id="scroll" checked> Scroll</label>
+      <label class="check fit"><input type="checkbox" id="now"> Interrupt now</label>
+    </div>
+
+    <div class="row">
+      <div class="fit"><button class="btn" data-variant="primary" id="send" type="button">Send to panel</button></div>
+      <div class="fit"><button class="btn" id="skip" type="button">Skip</button></div>
+      <div class="fit"><button class="btn" id="clear" type="button">Clear queue</button></div>
+    </div>
+
+    <div style="margin-top:var(--space-5)">
+      <span class="lbl">Local preview, approximate</span>
+      <div class="preview"><canvas id="pv" width="480" height="120"></canvas></div>
+      <div class="row" style="margin-top:var(--space-2)">
+        <div>
+          <label for="pvw">Preview columns</label>
+          <input type="number" id="pvw" value="32" min="8" max="128">
+        </div>
+        <div>
+          <label for="pvh">Preview rows</label>
+          <input type="number" id="pvh" value="8" min="5" max="32">
+        </div>
+      </div>
+      <p class="hint">The preview renders in this browser. It guesses the panel font, so treat it as a timing check, not a pixel match.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Effects</h2>
+    <div class="fx" id="fx"></div>
+    <div class="row" style="margin-top:var(--space-4)">
+      <div>
+        <label for="fxhold">Hold, ms</label>
+        <input type="number" id="fxhold" value="" min="0" step="500" placeholder="background">
+      </div>
+      <div style="flex:2 1 220px">
+        <p class="hint">Empty hold sends the effect as the background, replacing the rotation at runtime so queued messages still get through. A hold makes it an ordinary timed queue entry.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Console</h2>
+    <div class="field">
+      <label for="raw">Raw command JSON</label>
+      <textarea id="raw" spellcheck="false">{"queue":[{"say":"HEATSYNC LABS","color":"amber"},{"anim":"plasma","hold":4000}]}</textarea>
+    </div>
+    <div class="row" style="margin-bottom:var(--space-4)">
+      <div class="fit"><button class="btn" data-variant="primary" id="raw-send" type="button">Send JSON</button></div>
+      <div class="fit"><button class="btn" data-size="sm" id="raw-curl" type="button">Copy as curl</button></div>
+      <div class="fit"><button class="btn" data-size="sm" id="log-clear" type="button">Clear log</button></div>
+    </div>
+    <div id="log" aria-live="polite"></div>
+  </section>
+
+</div>
+
+<!-- ================= right column ================= -->
+<div>
+
+  <section class="card">
+    <h2>Panel</h2>
+    <div class="field">
+      <label for="bright">Brightness <span id="bright-val" style="font-family:var(--font-mono)">128</span></label>
+      <input type="range" id="bright" min="0" max="255" value="128">
+    </div>
+    <div class="row field">
+      <div>
+        <label for="power">Supply budget, mA</label>
+        <input type="number" id="power" value="" min="0" step="100" placeholder="3000">
+      </div>
+      <div class="fit"><button class="btn" id="power-set" type="button">Apply</button></div>
+    </div>
+    <label class="check"><input type="checkbox" id="save"> Write settings to flash</label>
+    <div class="row" style="margin-top:var(--space-3)">
+      <div class="fit"><button class="btn" id="off" type="button">Blank panel</button></div>
+      <div class="fit"><button class="btn" data-variant="danger" id="reboot" type="button">Reboot</button></div>
+    </div>
+    <p class="hint">draw_ma sitting at the power_ma ceiling means the limiter is dimming the panel. Raise the budget once the supply is known.</p>
+  </section>
+
+  <section class="card">
+    <h2>Idle rotation</h2>
+    <div id="rot-rows"></div>
+    <div class="row" style="margin-top:var(--space-3)">
+      <div class="fit"><button class="btn" data-size="sm" id="rot-add" type="button">Add entry</button></div>
+      <div>
+        <label for="rot-ms">Dwell, ms</label>
+        <input type="number" id="rot-ms" value="15000" min="500" step="500">
+      </div>
+    </div>
+    <div class="field" style="margin-top:var(--space-3)">
+      <label for="rot-open">Open Hours frames</label>
+      <input type="text" id="rot-open" value="OPEN|HOURS|WE'RE|OPEN|COME|IN|{until}" spellcheck="false">
+    </div>
+    <div class="row">
+      <div class="fit"><button class="btn" data-variant="primary" id="rot-send" type="button">Push rotation</button></div>
+      <div class="fit"><button class="btn" id="rot-load" type="button">Load from panel</button></div>
+    </div>
+    <p class="hint">Six entries maximum, each taking a turn. While the doors read open, the Open Hours frames are mixed in every other turn: one word per frame, split with |, five letters fit. {until} becomes UNTIL and the closing time when the status feed gives one, and is skipped when it does not. Leave it empty to turn it off.</p>
+  </section>
+
+  <section class="card">
+    <h2>Lab status</h2>
+    <label class="check"><input type="checkbox" id="st-en" checked> Poll the SpaceAPI door status</label>
+    <div class="field" style="margin-top:var(--space-3)">
+      <label for="st-url">Status URL</label>
+      <input type="text" id="st-url" value="https://members.heatsynclabs.org/space_api.json" spellcheck="false">
+    </div>
+    <div class="row field">
+      <div>
+        <label for="st-key">Key</label>
+        <input type="text" id="st-key" value="open" spellcheck="false">
+      </div>
+      <div>
+        <label for="st-poll">Poll, s</label>
+        <input type="number" id="st-poll" value="300" min="30" step="30">
+      </div>
+      <div>
+        <label for="st-every">Show every</label>
+        <input type="number" id="st-every" value="2" min="1" max="10">
+      </div>
+    </div>
+    <div class="row">
+      <div class="fit"><button class="btn" data-variant="primary" id="st-save" type="button">Apply settings</button></div>
+      <div class="fit"><button class="btn" id="st-poll-now" type="button">Poll now</button></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Stored animations</h2>
+    <div id="anims"><p class="hint">Load to list what is on the panel.</p></div>
+    <div class="row" style="margin-top:var(--space-3)">
+      <div class="fit"><button class="btn" id="anim-load" type="button">Load list</button></div>
+      <div>
+        <label for="anim-fps">FPS override</label>
+        <input type="number" id="anim-fps" value="" min="1" max="120" placeholder="stored">
+      </div>
+    </div>
+  </section>
+
+</div>
+</div>
+</main>
+
+<footer data-ground="plate" style="background:var(--g-bg);color:var(--g-ink)">
+  <div class="wrap foot">
+    <span>HeatSync Labs, Mesa. Everyone is welcome.</span>
+    <span id="foot-target">marquee.local</span>
+  </div>
+</footer>
+
+<script>
+"use strict";
+
+/* ============================================================
+   config and small helpers
+   ============================================================ */
+var COLORS = ["white","red","green","blue","yellow","orange","cyan","magenta",
+              "pink","purple","lime","amber","teal","black"];
+var SWATCH = { white:"#ffffff", red:"#ff0000", green:"#00ff00", blue:"#2b4cff",
+  yellow:"#ffff00", orange:"#ff8000", cyan:"#00ffff", magenta:"#ff00ff",
+  pink:"#ff5090", purple:"#8000ff", lime:"#9dff00", amber:"#ffbf00",
+  teal:"#00ff9d", black:"#000000" };
+var EFFECTS = ["off","solid","rainbow","plasma","fire","rain","sparkle",
+               "comet","chase","breathe","confetti","clock"];
+
+var $ = function (id) { return document.getElementById(id); };
+var state = { ws:null, httpOK:null, color:"amber", rawState:null, timer:null, corsShown:false };
+
+function store(k, v) {
+  try {
+    if (v === undefined) { var r = localStorage.getItem("marquee." + k); return r === null ? undefined : r; }
+    localStorage.setItem("marquee." + k, v);
+  } catch (e) { return undefined; }
+}
+
+function now2() {
+  var d = new Date();
+  return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2)
+       + ":" + ("0" + d.getSeconds()).slice(-2);
+}
+
+function log(kind, text) {
+  var el = $("log");
+  var line = document.createElement("div");
+  line.innerHTML = '<span class="t">' + now2() + '</span> <span class="' + kind + '">'
+    + (kind === "tx" ? "TX" : kind === "rx" ? "RX" : "!!") + "</span> "
+    + String(text).replace(/[<>&]/g, function (c) {
+        return c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&amp;"; });
+  el.appendChild(line);
+  while (el.children.length > 250) { el.removeChild(el.firstChild); }
+  el.scrollTop = el.scrollHeight;
+}
+
+function host() { return ($("host").value || "marquee.local").trim().replace(/^https?:\/\//, "").replace(/\/+$/, ""); }
+function base() { return "http://" + host(); }
+
+/* The panel lives on the lab network and speaks plain http. A page served
+   over https (GitHub Pages) may still reach it in Chrome and Edge: the
+   targetAddressSpace hint plus the browser's "local network access" prompt
+   lift the mixed content block for .local names and private addresses.
+   Other browsers ignore the hint; there, open http://marquee.local/. */
+function lan(path, opts) {
+  opts = opts || {};
+  opts.targetAddressSpace = "local";
+  return fetch(base() + path, opts);
+}
+
+function dot(id, st) { $(id).setAttribute("data-state", st); }
+
+function blockedNote() {
+  if (state.corsShown) { return; }
+  state.corsShown = true;
+  if (location.protocol === "https:") {
+    corsNote("This browser kept the page from reaching the panel. You need to be on the lab Wi-Fi. "
+      + "In Chrome or Edge, allow local network access when asked (the icon at the left of the address bar). "
+      + "Safari and Firefox do not allow it from an https page: open http://" + host() + "/ instead, "
+      + "the panel serves its own control page.");
+  } else {
+    corsNote("The panel did not answer at " + host() + ". Check that you are on the lab Wi-Fi, "
+      + "or try its IP address instead of the .local name.");
+  }
+}
+
+function corsNote(msg) {
+  var n = $("cors-note");
+  n.textContent = msg;
+  n.hidden = false;
+}
+
+/* ============================================================
+   transport, one command object over socket or HTTP
+   ============================================================ */
+function openSocket() {
+  try { if (state.ws) { state.ws.onclose = null; state.ws.close(); } } catch (e) {}
+  var url = "ws://" + host() + ":81/";
+  var ws;
+  try { ws = new WebSocket(url); } catch (e) { log("er", "socket refused: " + e.message); return; }
+  state.ws = ws;
+  dot("d-ws", "warn");
+  ws.onopen = function () { dot("d-ws", "on"); log("rx", "socket open on " + url); };
+  ws.onclose = function () {
+    dot("d-ws", "off");
+    if (!state.wsWarned) {
+      state.wsWarned = true;
+      log("er", "socket on port 81 is not answering, commands will go out over HTTP instead");
+    }
+    if (state.ws === ws) { setTimeout(function () { if (state.ws === ws) { openSocket(); } }, 4000); }
+  };
+  ws.onerror = function () { dot("d-ws", "off"); };
+  ws.onmessage = function (ev) {
+    if (typeof ev.data !== "string") { return; }
+    log("rx", ev.data.slice(0, 400));
+    try {
+      var o = JSON.parse(ev.data);
+      if (o && typeof o === "object" && !Array.isArray(o)) { applyState(o); }
+    } catch (e) {}
+  };
+}
+
+function send(cmd) {
+  var body = JSON.stringify(cmd);
+  if ($("save").checked) { cmd.save = true; body = JSON.stringify(cmd); }
+  log("tx", body);
+  if (state.ws && state.ws.readyState === 1) {
+    state.ws.send(body);
+    return Promise.resolve(true);
+  }
+  /* text/plain keeps this a simple request, so it lands even when the
+     response is unreadable from a file:// page */
+  return lan("/api/cmd", {
+    method: "POST", headers: { "Content-Type": "text/plain" }, body: body
+  }).then(function (r) { return r.text().then(function (t) {
+      if (t) { log("rx", t.slice(0, 300)); } return true; });
+  }).catch(function (e) {
+    log("er", "panel did not answer (" + e.message + ")");
+    blockedNote();
+    return false;
+  });
+}
+
+function getJSON(path) {
+  return lan(path, { method: "GET" }).then(function (r) { return r.json(); });
+}
+
+/* ============================================================
+   state readout
+   ============================================================ */
+function applyState(o) {
+  state.rawState = o;
+  var pick = function () {
+    for (var i = 0; i < arguments.length; i++) {
+      var k = arguments[i];
+      if (o[k] !== undefined && o[k] !== null) { return o[k]; }
+    }
+    return undefined;
+  };
+  var up = pick("uptime", "uptime_s", "up");
+  var heap = pick("heap", "free_heap", "freeheap");
+  var br = pick("brightness", "bri");
+  var draw = pick("draw_ma");
+  var budget = pick("power_ma");
+  var q = pick("queue", "queued", "queue_len");
+  var open = pick("open", "lab_open", "status_open");
+  if (open === undefined && o.status && typeof o.status === "object") { open = o.status.on; }
+  var cur = pick("current", "showing", "text", "item");
+
+  var cells = [];
+  if (up !== undefined) { cells.push(["Uptime", fmtUp(up)]); }
+  if (heap !== undefined) { cells.push(["Free heap", Number(heap).toLocaleString()]); }
+  if (o.time) { cells.push(["Panel time", String(o.time).slice(11, 16)]); }
+  if (br !== undefined) { cells.push(["Brightness", br]); }
+  if (draw !== undefined) { cells.push(["Draw mA", draw + (budget !== undefined ? " / " + budget : "")]); }
+  if (q !== undefined) { cells.push(["Queue", Array.isArray(q) ? q.length : q]); }
+  $("stats").innerHTML = cells.map(function (c) {
+    return '<div class="stat"><b></b><span>' + c[0] + "</span></div>";
+  }).join("");
+  Array.prototype.forEach.call($("stats").querySelectorAll(".stat b"), function (b, i) {
+    b.textContent = cells[i][1];
+  });
+
+  if (open === true) { dot("d-lab", "on"); }
+  else if (open === false) { dot("d-lab", "off"); }
+  if (cur && typeof cur === "object") { cur = cur.arg; }
+  if (cur !== undefined) { $("showing").textContent = String(cur).replace(/\|/g, " ").slice(0, 40); }
+  if (br !== undefined && document.activeElement !== $("bright")) {
+    $("bright").value = br; $("bright-val").textContent = br;
+  }
+  if (budget !== undefined && document.activeElement !== $("power") && !$("power").value) {
+    $("power").value = budget;
+  }
+
+  var rows = Object.keys(o).map(function (k) {
+    var v = o[k];
+    return "<tr><td>" + k + "</td><td>" + escapeHTML(typeof v === "object" ? JSON.stringify(v) : String(v)) + "</td></tr>";
+  }).join("");
+  $("state-kv").innerHTML = rows;
+}
+
+function escapeHTML(s) {
+  return String(s).replace(/[<>&]/g, function (c) {
+    return c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&amp;"; });
+}
+
+function fmtUp(v) {
+  var s = Number(v);
+  if (!isFinite(s)) { return String(v); }
+  if (s > 1e6) { s = Math.round(s / 1000); }
+  var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return h ? h + "h " + m + "m" : m + "m " + (s % 60) + "s";
+}
+
+function poll() {
+  getJSON("/api/state").then(function (o) {
+    dot("d-http", "on");
+    state.httpOK = true;
+    $("cors-note").hidden = true;
+    applyState(o);
+  }).catch(function () {
+    dot("d-http", "off");
+    if (state.httpOK === null) { state.httpOK = false; blockedNote(); }
+  });
+}
+
+function placeholderStats() {
+  $("stats").innerHTML = [["Uptime", "--"], ["Free heap", "--"], ["Brightness", "--"], ["Draw mA", "--"]]
+    .map(function (c) { return '<div class="stat"><b>' + c[1] + "</b><span>" + c[0] + "</span></div>"; }).join("");
+}
+
+function connect() {
+  store("host", $("host").value);
+  $("foot-target").textContent = host();
+  state.wsWarned = false;
+  log("tx", "opening " + base() + " and ws://" + host() + ":81/");
+  openSocket();
+  poll();
+  if (state.timer) { clearInterval(state.timer); }
+  state.timer = setInterval(poll, 4000);
+}
+
+/* ============================================================
+   message build
+   ============================================================ */
+function colorValue() {
+  var hex = $("hex").value.trim();
+  if (hex) { return hex; }
+  return state.color;
+}
+
+function buildMessage() {
+  var cmd = { say: $("msg").value };
+  if ($("rainbow").checked) { cmd.rainbow = true; }
+  else { cmd.color = colorValue(); }
+  var sp = parseFloat($("speed").value); if (isFinite(sp)) { cmd.speed = sp; }
+  var rp = parseInt($("repeat").value, 10); if (isFinite(rp) && rp !== 1) { cmd.repeat = rp; }
+  var hd = parseInt($("hold").value, 10); if (isFinite(hd)) { cmd.hold = hd; }
+  if (!$("scroll").checked) { cmd.scroll = false; }
+  if ($("now").checked) { cmd.now = true; }
+  return cmd;
+}
+
+/* ============================================================
+   swatches, effects, wiring
+   ============================================================ */
+function buildSwatches() {
+  var box = $("swatches");
+  COLORS.forEach(function (name) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "sw"; b.style.background = SWATCH[name];
+    b.textContent = name === "black" ? "off" : name;
+    b.setAttribute("aria-pressed", name === state.color ? "true" : "false");
+    b.title = name;
+    if (name === "black" || name === "blue" || name === "purple") { b.style.color = "#ece3d3"; }
+    b.onclick = function () {
+      state.color = name; $("hex").value = "";
+      Array.prototype.forEach.call(box.children, function (c) { c.setAttribute("aria-pressed", "false"); });
+      b.setAttribute("aria-pressed", "true");
+      drawPreview();
+    };
+    box.appendChild(b);
+  });
+  var r = document.createElement("button");
+  r.type = "button"; r.className = "sw rain"; r.textContent = "rainbow"; r.title = "rainbow";
+  r.onclick = function () { $("rainbow").checked = !$("rainbow").checked; drawPreview(); };
+  box.appendChild(r);
+}
+
+function buildEffects() {
+  var box = $("fx");
+  EFFECTS.forEach(function (name) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "btn"; b.setAttribute("data-size", "sm");
+    b.textContent = name;
+    b.onclick = function () {
+      var cmd = { anim: name };
+      var hd = parseInt($("fxhold").value, 10);
+      if (isFinite(hd) && hd > 0) { cmd.hold = hd; }
+      var hex = $("hex").value.trim();
+      if (name === "solid") { cmd.color = hex || state.color; }
+      send(cmd);
+    };
+    box.appendChild(b);
+  });
+}
+
+/* ============================================================
+   rotation editor
+   ============================================================ */
+function rotRow(kind, value, extra) {
+  var row = document.createElement("div");
+  row.className = "rot-row";
+  var sel = document.createElement("select");
+  ["say", "cards", "anim", "play"].forEach(function (k) {
+    var o = document.createElement("option"); o.value = k; o.textContent = k; sel.appendChild(o);
+  });
+  sel.value = kind || "say";
+  var inp = document.createElement("input");
+  inp.type = "text"; inp.spellcheck = false; inp.value = value || "";
+  var del = document.createElement("button");
+  del.type = "button"; del.className = "btn"; del.setAttribute("data-size", "sm");
+  del.textContent = "X"; del.setAttribute("aria-label", "Remove entry");
+  del.onclick = function () { row.remove(); };
+  if (extra) { row.dataset.extra = JSON.stringify(extra); }
+  row.appendChild(sel); row.appendChild(inp); row.appendChild(del);
+  $("rot-rows").appendChild(row);
+  return row;
+}
+
+function rotationDoc() {
+  var items = [];
+  Array.prototype.forEach.call($("rot-rows").children, function (row) {
+    var kind = row.querySelector("select").value;
+    var val = row.querySelector("input").value.trim();
+    if (!val) { return; }
+    var o = {};
+    try { o = JSON.parse(row.dataset.extra || "{}"); } catch (e) { o = {}; }
+    ["say", "text", "cards", "anim", "play"].forEach(function (k) { delete o[k]; });
+    o[kind] = val;
+    items.push(o);
+  });
+  var doc = { ms: parseInt($("rot-ms").value, 10) || 15000, items: items.slice(0, 6) };
+  var open = $("rot-open").value.trim();
+  doc.open = open ? { cards: open, color: "#33ff66" } : false;
+  return doc;
+}
+
+/* ============================================================
+   stored animations
+   ============================================================ */
+function renderAnims(list) {
+  var box = $("anims");
+  box.innerHTML = "";
+  if (!list || !list.length) {
+    box.innerHTML = '<p class="hint">Nothing stored on the panel.</p>';
+    return;
+  }
+  list.forEach(function (item) {
+    var name = typeof item === "string" ? item : (item.name || item.id || JSON.stringify(item));
+    var row = document.createElement("div");
+    row.className = "anim-row";
+    var s = document.createElement("span"); s.textContent = name;
+    var play = document.createElement("button");
+    play.type = "button"; play.className = "btn"; play.setAttribute("data-size", "sm");
+    play.textContent = "Play";
+    play.onclick = function () {
+      var cmd = { play: name };
+      var f = parseInt($("anim-fps").value, 10);
+      if (isFinite(f)) { cmd.fps = f; }
+      send(cmd);
+    };
+    var del = document.createElement("button");
+    del.type = "button"; del.className = "btn"; del.setAttribute("data-size", "sm");
+    del.setAttribute("data-variant", "danger"); del.textContent = "Delete";
+    del.onclick = function () {
+      if (!confirm("Delete stored animation " + name + "?")) { return; }
+      lan("/api/anim?name=" + encodeURIComponent(name), { method: "DELETE" })
+        .then(function () { log("rx", "deleted " + name); loadAnims(); })
+        .catch(function (e) { log("er", "delete failed: " + e.message); });
+    };
+    row.appendChild(s); row.appendChild(play); row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+
+function loadAnims() {
+  getJSON("/api/anim").then(function (o) {
+    var list = Array.isArray(o) ? o : (o.anims || o.animations || o.items || Object.keys(o));
+    renderAnims(list);
+  }).catch(function (e) {
+    $("anims").innerHTML = '<p class="hint">Could not read the list. Cross origin reads are blocked '
+      + 'from a file, so serve this page from the panel to manage stored animations.</p>';
+    log("er", "anim list: " + e.message);
+  });
+}
+
+/* ============================================================
+   LED preview
+   ============================================================ */
+var pv = { off: 0, last: 0 };
+
+function glyphMap(text, rows) {
+  var c = document.createElement("canvas");
+  var ctx = c.getContext("2d");
+  var size = rows;
+  ctx.font = "600 " + size + 'px "JetBrains Mono", monospace';
+  var w = Math.max(1, Math.ceil(ctx.measureText(text).width));
+  c.width = w + 2; c.height = rows;
+  ctx = c.getContext("2d");
+  ctx.font = "600 " + size + 'px "JetBrains Mono", monospace';
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#fff";
+  ctx.fillText(text, 1, rows - Math.max(1, Math.round(rows * 0.12)));
+  var d = ctx.getImageData(0, 0, c.width, c.height).data;
+  var map = [];
+  for (var x = 0; x < c.width; x++) {
+    var col = [];
+    for (var y = 0; y < rows; y++) {
+      col.push(d[(y * c.width + x) * 4 + 3] > 110 ? 1 : 0);
+    }
+    map.push(col);
+  }
+  return map;
+}
+
+var pvCache = { key: "", map: null };
+
+function drawPreview(ts) {
+  var cv = $("pv"), ctx = cv.getContext("2d");
+  var cols = Math.max(8, parseInt($("pvw").value, 10) || 32);
+  var rows = Math.max(5, parseInt($("pvh").value, 10) || 8);
+  var cell = Math.max(4, Math.floor(480 / cols));
+  cv.width = cols * cell; cv.height = rows * cell;
+
+  var text = $("msg").value || " ";
+  var key = text + "|" + rows;
+  if (pvCache.key !== key) { pvCache.key = key; pvCache.map = glyphMap(text, rows); pv.off = cols; }
+  var map = pvCache.map;
+
+  var speed = parseFloat($("speed").value) || 20;
+  var t = ts || performance.now();
+  var dt = pv.last ? (t - pv.last) / 1000 : 0;
+  pv.last = t;
+  var scrolling = $("scroll").checked;
+  if (scrolling) {
+    pv.off -= speed * dt;
+    if (pv.off < -map.length) { pv.off = cols; }
+  } else {
+    pv.off = Math.round((cols - map.length) / 2);
+  }
+
+  ctx.fillStyle = "#14110d";
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  var rain = $("rainbow").checked;
+  var solid = $("hex").value.trim() || SWATCH[state.color] || "#f2ab1e";
+
+  for (var x = 0; x < cols; x++) {
+    var src = Math.round(x - pv.off);
+    for (var y = 0; y < rows; y++) {
+      var on = src >= 0 && src < map.length && map[src][y];
+      if (on) {
+        ctx.fillStyle = rain ? "hsl(" + Math.round((x / cols) * 330) + ",95%,58%)" : solid;
+      } else {
+        ctx.fillStyle = "rgba(236,227,211,0.05)";
+      }
+      ctx.beginPath();
+      ctx.arc(x * cell + cell / 2, y * cell + cell / 2, Math.max(1.2, cell * 0.36), 0, 6.2832);
+      ctx.fill();
+    }
+  }
+  requestAnimationFrame(drawPreview);
+}
+
+/* ============================================================
+   wiring
+   ============================================================ */
+function wire() {
+  var saved = store("host");
+  if (saved) { $("host").value = saved; }
+  /* Served by the panel itself: talk to where the page came from. */
+  if (location.protocol === "http:" && location.host) { $("host").value = location.host; }
+  $("foot-target").textContent = host();
+
+  $("connect").onclick = connect;
+  $("host").addEventListener("keydown", function (e) { if (e.key === "Enter") { connect(); } });
+
+  $("theme").onclick = function () {
+    var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    store("theme", next);
+  };
+  var th = store("theme");
+  if (th) { document.documentElement.setAttribute("data-theme", th); }
+
+  $("msg").addEventListener("input", function () {
+    $("count").textContent = $("msg").value.length;
+  });
+  $("msg").addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $("send").click(); }
+  });
+  $("hex").addEventListener("input", drawPreview);
+
+  $("send").onclick = function () {
+    var t = $("msg").value.trim();
+    if (!t) { log("er", "nothing to send"); return; }
+    send(buildMessage());
+  };
+  $("skip").onclick = function () { send({ skip: true }); };
+  $("clear").onclick = function () { send({ clear: true }); };
+  $("off").onclick = function () { send({ anim: "off" }); };
+
+  $("bright").addEventListener("input", function () { $("bright-val").textContent = this.value; });
+  $("bright").addEventListener("change", function () { send({ brightness: parseInt(this.value, 10) }); });
+  $("power-set").onclick = function () {
+    var v = parseInt($("power").value, 10);
+    if (!isFinite(v)) { log("er", "enter a milliamp budget, 0 disables the limiter"); return; }
+    send({ power_ma: v });
+  };
+  $("reboot").onclick = function () {
+    if (!confirm("Reboot the panel?")) { return; }
+    lan("/api/reboot", { method: "POST", headers: { "Content-Type": "text/plain" }, body: "{}" })
+      .then(function () { log("rx", "reboot requested"); })
+      .catch(function () { log("rx", "reboot sent, no readable reply"); });
+  };
+
+  $("rot-add").onclick = function () {
+    if ($("rot-rows").children.length >= 6) { log("er", "six entries maximum"); return; }
+    rotRow("say", "");
+  };
+  $("rot-send").onclick = function () { send({ rotate: rotationDoc() }); };
+  $("rot-load").onclick = function () {
+    getJSON("/api/rotate").then(function (doc) {
+      log("rx", JSON.stringify(doc).slice(0, 400));
+      $("rot-rows").innerHTML = "";
+      var items = doc.items || doc.idle || [];
+      items.forEach(function (it) {
+        if (typeof it === "string") { rotRow("say", it); return; }
+        var kind = it.say !== undefined ? "say" : it.text !== undefined ? "say"
+                 : it.cards !== undefined ? "cards"
+                 : it.anim !== undefined ? "anim" : "play";
+        rotRow(kind, it.say || it.text || it.cards || it.anim || it.play || "", it);
+      });
+      if (doc.ms) { $("rot-ms").value = doc.ms; }
+      if (doc.open && typeof doc.open === "object") { $("rot-open").value = doc.open.cards || doc.open.text || ""; }
+      else if (doc.open === false || !doc.open) { $("rot-open").value = ""; }
+    }).catch(function (e) { log("er", "rotation read blocked: " + e.message); });
+  };
+
+  $("st-save").onclick = function () {
+    var cfg = {
+      status_enabled: $("st-en").checked,
+      status_url: $("st-url").value.trim(),
+      status_key: $("st-key").value.trim(),
+      status_poll_s: parseInt($("st-poll").value, 10) || 300,
+      status_every: parseInt($("st-every").value, 10) || 2
+    };
+    log("tx", "POST /api/config " + JSON.stringify(cfg));
+    lan("/api/config", {
+      method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(cfg)
+    }).then(function (r) { return r.text(); })
+      .then(function (t) { log("rx", t.slice(0, 300) || "config accepted"); })
+      .catch(function () { log("rx", "config sent, no readable reply"); });
+  };
+  $("st-poll-now").onclick = function () {
+    lan("/api/status/poll", { method: "POST", headers: { "Content-Type": "text/plain" }, body: "{}" })
+      .then(function (r) { return r.text(); })
+      .then(function (t) { log("rx", t.slice(0, 300) || "poll forced"); setTimeout(poll, 2000); })
+      .catch(function () { log("rx", "poll forced, no readable reply"); setTimeout(poll, 2000); });
+  };
+
+  $("anim-load").onclick = loadAnims;
+
+  $("raw-send").onclick = function () {
+    var txt = $("raw").value.trim();
+    if (!txt) { return; }
+    var o;
+    try { o = JSON.parse(txt); } catch (e) { log("er", "not valid JSON: " + e.message); return; }
+    send(o);
+  };
+  $("raw-curl").onclick = function () {
+    var txt = $("raw").value.trim().replace(/\s+/g, " ");
+    var cmd = "curl -d '" + txt + "' " + base() + "/api/cmd";
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(cmd).then(function () { log("rx", "copied: " + cmd); },
+        function () { log("rx", cmd); });
+    } else { log("rx", cmd); }
+  };
+  $("log-clear").onclick = function () { $("log").innerHTML = ""; };
+
+  ["pvw", "pvh"].forEach(function (id) {
+    $(id).addEventListener("input", function () { pvCache.key = ""; });
+  });
+  $("msg").addEventListener("input", function () { pvCache.key = ""; });
+  $("scroll").addEventListener("change", function () { pv.off = 64; });
+  $("rainbow").addEventListener("change", drawPreview);
+
+  placeholderStats();
+  buildSwatches();
+  buildEffects();
+  rotRow("say", "HEATSYNC LABS");
+  rotRow("anim", "plasma");
+  requestAnimationFrame(drawPreview);
+  connect();
+}
+
+document.addEventListener("DOMContentLoaded", wire);
+</script>
+</body>
+</html>

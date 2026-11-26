@@ -178,7 +178,7 @@ def cmd_rotate(args):
                         for x in args.set]
         changed = True
     if args.open is not None:
-        rot["open"] = {"text": args.open, "color": args.open_color} if args.open else False
+        rot["open"] = {"cards": args.open, "color": args.open_color} if args.open else False
         changed = True
     if changed:
         post(args.host, "/api/rotate", json.dumps(rot))
@@ -261,8 +261,9 @@ def main():
     s.add_argument("--set", nargs="+", metavar="ENTRY",
                    help="effect names, or JSON command objects")
     s.add_argument("--ms", type=int, help="how long each entry stays up")
-    s.add_argument("--open", metavar="TEXT",
-                   help="what to show while the status poll is true; empty string turns it off")
+    s.add_argument("--open", metavar="FRAMES",
+                   help="frames to show while the status poll is true, split with |, "
+                        "e.g. \"OPEN|HOURS|COME|IN|{until}\"; empty string turns it off")
     s.add_argument("--open-color", default="#33ff66")
     s.set_defaults(func=cmd_rotate)
 

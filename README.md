@@ -6,10 +6,11 @@ plays them.
 
 - `http://marquee.local/` for a small web UI
 - one JSON command over HTTP, WebSocket, UDP or a CLASP relay
-- eleven built-in effects, a clock, and animations you upload yourself
+- a control page hosted on GitHub Pages: <https://heatsynclabs.github.io/marquee/>
+- twelve built-in effects, a clock, a little robot, and animations you upload yourself
 - an idle rotation that cycles through whatever you want it showing
 - watches a JSON endpoint and mixes in a message while it is true, which is
-  how it shows LAB OPEN when HeatSync Labs is open
+  how it shows OPEN HOURS / COME IN when HeatSync Labs is open
 - live pixel streaming at 50 fps
 - power-limited so a USB supply will not brown out
 
@@ -53,13 +54,15 @@ After the first flash the panel comes up as a Wi-Fi access point called
 `marquee-setup`. Join it, open any page, and enter your network details. It
 reboots and appears on your network as `marquee.local`.
 
-Later updates can go over the air:
+Later updates go over the air:
 
-    OTA=$(find ~/Library/Arduino15/packages/esp8266 -name espota.py | head -1)
-    python3 "$OTA" -i marquee.local -f /path/to/marquee.ino.bin
+    pio run -e ota -t upload                       # or --upload-port <ip>
 
-Building with `-b esp8266:esp8266:nodemcuv2:xtal=160` runs the board at 160 MHz,
-which halves the pause during a status poll. Everything else works the same.
+Always build with PlatformIO from this repository. `platformio.ini` pins the
+platform, the libraries, 160 MHz and the flash layout (4 MB, 2 MB filesystem).
+A build with a different layout cannot mount the saved filesystem, so the panel
+comes back with its settings wiped and opens the setup portal. If you must use
+arduino-cli, pass `-b esp8266:esp8266:nodemcuv2:xtal=160,eesz=4M2M`.
 
 ## Use it
 
@@ -73,7 +76,7 @@ Anything that speaks HTTP works:
 Or the bundled client:
 
     tools/marquee.py say "hello world" --color red
-    tools/marquee.py anim plasma
+    tools/marquee.py anim robot
     tools/marquee.py bright 90
     tools/marquee.py idle clock
     tools/marquee.py upload cat cat.gif --fps 12
@@ -90,7 +93,7 @@ The full command reference is in [docs/api.md](docs/api.md).
 The idle rotation is a short list of things that take turns, fifteen seconds
 each by default:
 
-    tools/marquee.py rotate --set clock plasma
+    tools/marquee.py rotate --set clock robot
     tools/marquee.py rotate --set clock '{"text":"HEATSYNC LABS","color":"#ff9f43"}'
     tools/marquee.py rotate --ms 20000
 
@@ -102,22 +105,26 @@ afterwards.
 The panel polls a JSON endpoint every five minutes and, while the value it
 watches is true, mixes an extra entry into the rotation every other turn:
 
-    clock -> LAB OPEN -> HEATSYNC LABS -> LAB OPEN -> plasma -> LAB OPEN -> ...
+    clock -> OPEN HOURS ... -> HEATSYNC LABS -> OPEN HOURS ... -> robot -> ...
+
+The open entry is a run of still frames, one word each so nothing scrolls:
+OPEN, HOURS, WE'RE, OPEN, COME, IN. If the feed also says when the lab closes
+(`"open_until": "21:00"`), two more frames follow: UNTIL, 9 PM.
 
 Out of the box it reads `https://members.heatsynclabs.org/space_api.json` and
 watches `open`, the same SpaceAPI document the HeatSync Labs website uses for
 its own door indicator. When the lab is closed, nothing extra is shown.
 
     tools/marquee.py status                     what it last saw
-    tools/marquee.py rotate --open "LAB OPEN"   change the message
-    tools/marquee.py rotate --open ""           turn it off
+    tools/marquee.py rotate --open "OPEN|HOURS|COME|IN|{until}"   change the frames
+    tools/marquee.py rotate --open ""                              turn it off
 
 Point it somewhere else with `status_url` and `status_key`; any endpoint
 returning a JSON boolean works. Details in [docs/api.md](docs/api.md).
 
 ## Animations
 
-Eleven effects ship with the firmware: `rainbow`, `plasma`, `fire`, `rain`,
+Twelve effects ship with the firmware: `robot`, `rainbow`, `plasma`, `fire`, `rain`,
 `sparkle`, `comet`, `chase`, `breathe`, `confetti`, `solid`, `off`, plus
 `clock`.
 
@@ -145,6 +152,43 @@ would rather keep everything on your own network. [docs/clasp.md](docs/clasp.md)
 covers all three arrangements and why the panel cannot reach
 `wss://relay.clasp.to` by itself.
 
+## Control page
+
+<https://heatsynclabs.github.io/marquee/> is the full console (messages,
+rotation, status, stored animations, raw commands). It runs in your browser
+and talks straight to the panel, so you need to be on the same network as it.
+
+The page is https and the panel is plain http on the local network. Chrome and
+Edge allow that after asking for local network access; accept the prompt (or
+allow it from the icon at the left of the address bar). Safari and Firefox do
+not; in those, open `http://marquee.local/`, which is the panel's own simpler
+control page. If `.local` names do not resolve on your device, type the
+panel's IP address into the host field instead.
+
+## Staying up
+
+The panel is meant to run unattended for months. What keeps it that way:
+
+- Wi-Fi never blocks. It keeps retrying for as long as the panel is powered.
+  The setup portal only opens on a panel with no network saved, or one that has
+  not reached its network for 3 minutes since boot, and it closes again on its
+  own once the network is back. A panel that loses Wi-Fi for 10 minutes
+  restarts.
+- Wi-Fi modem sleep is off, so replies and mDNS stay quick.
+- The LED driver turns interrupts off for about 7 ms per frame, which Wi-Fi
+  feels. Frames are capped at 30 per second and frames that did not change are
+  not sent at all.
+- No floating point in the effects; the ESP8266 has no FPU.
+- The status poll reuses one TLS client, checks the largest free block before
+  it starts, has short DNS and connect timeouts, and runs only on a still frame.
+- Every value used as a divisor is clamped, so no command can crash the panel.
+- WebSocket clients are pinged and dropped when they stop answering.
+- If the heap stays too fragmented for a minute, the panel restarts at an idle
+  moment rather than limp on. Three quick crashes in a row turn the optional
+  relay client off.
+- `/api/state` reports `reset_reason`, `max_block`, `heap_frag`,
+  `loop_max_ms` and `wifi_drops`, so you can see how it is doing.
+
 ## Power
 
 240 pixels at full white would draw about 14 A, far more than any USB port.
@@ -163,14 +207,17 @@ dimming the panel.
       config.h          pin, panel size, wiring and defaults
       matrix.*          pixel buffer, mapping, text drawing
       effects.*         built-in animations
+      robot.*           the robot routine
       player.*          the queue and the idle rotation
       commands.*        the JSON command interpreter
       web.*             HTTP, WebSocket and UDP
       status.*          the JSON status poll
       clasp_link.*      optional relay client
-      net.*             Wi-Fi, setup portal, mDNS, OTA
+      net.*             Wi-Fi, setup portal, mDNS, OTA, NTP
+      health.*          reset reason, loop timing, heap guard
     tools/              command line client, relay bridge and a local relay
-    docs/               API and relay documentation
+    docs/               API and relay documentation, and the hosted
+                        control page (docs/index.html, served by GitHub Pages)
 
 ## License
 

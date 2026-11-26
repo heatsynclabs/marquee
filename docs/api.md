@@ -24,13 +24,14 @@ internet.
 | `text` (or `say`) | string | Message to display, up to 127 characters. |
 | `anim` | string | Built-in effect name. |
 | `play` | string | Stored animation name. |
+| `cards` | string or array | Still frames shown one after another, e.g. `"OPEN\|HOURS"` or `["OPEN","HOURS"]`. Five characters fit; a longer word scrolls once. `{until}` becomes UNTIL and the closing time, see [Status polling](#status-polling). |
 | `color` | string or number | See [Colors](#colors). |
 | `rainbow` | bool | Color the text by column instead of using `color`. |
-| `speed` | number | Scroll speed in pixels per second. Default 20, which reads comfortably; 40 is brisk. |
+| `speed` | number | Scroll speed in pixels per second, 1 to 200. Default 20, which reads comfortably; 40 is brisk. |
 | `repeat` | number | How many times to play. `-1` repeats forever. Default 1. |
 | `scroll` | bool | `false` centers the text instead of scrolling. Default true. |
-| `hold` | number | Milliseconds to hold before moving on. |
-| `fps` | number | Override a stored animation's frame rate. |
+| `hold` | number | Milliseconds to hold before moving on. For `cards`, how long each frame stays up (default 1100). |
+| `fps` | number | Override a stored animation's frame rate, up to 60. |
 | `now` | bool | Drop the queue and play immediately. Default false, which queues. |
 | `clear` | bool | Empty the queue and return to the idle rotation. |
 | `skip` | bool | Move on to the next queued item. |
@@ -42,7 +43,7 @@ internet.
 | `save` | bool | Write settings to flash immediately instead of a second later. |
 | `queue` | array | A list of command objects, applied in order. |
 
-A command with no `text`, `anim` or `play` only changes settings.
+A command with no `text`, `cards`, `anim` or `play` only changes settings.
 
 ```json
 {"text": "HELLO", "color": "rainbow", "repeat": 3}
@@ -67,7 +68,12 @@ the frame would draw more than `power_ma`.
 ## Animations
 
 Built in: `off`, `solid`, `rainbow`, `plasma`, `fire`, `rain`, `sparkle`,
-`comet`, `chase`, `breathe`, `confetti`, `clock`.
+`comet`, `chase`, `breathe`, `confetti`, `clock`, `robot`.
+
+`robot` is a small character routine: it walks in, waves, hops and walks off,
+then flies across on a jetpack trailing rainbow stripes (the trans flag on
+about one appearance in three). One full routine is 23.2 s, so give it
+`"hold": 23200` in the rotation to let it finish.
 
 `solid`, `sparkle`, `comet`, `chase` and `breathe` use `color`. `clock` reads
 the time over NTP and shows `HH:MM`, which fills the panel exactly.
@@ -110,9 +116,16 @@ is open, using the same SpaceAPI document the lab's own website reads.
     GET https://members.heatsynclabs.org/space_api.json  ->  {... "open": true}
 
 While `open` is true, the `open` item appears every `status_every` turns of the
-rotation, so it keeps coming back around between everything else:
+rotation, so it keeps coming back around between everything else. By default it
+is a run of still frames that each fit the panel, so nothing has to scroll:
 
-    clock -> LAB OPEN -> HEATSYNC LABS -> LAB OPEN -> plasma -> LAB OPEN -> ...
+    OPEN | HOURS | WE'RE | OPEN | COME | IN | UNTIL | 9 PM
+
+    clock -> (open frames) -> HEATSYNC LABS -> (open frames) -> robot -> ...
+
+The last two frames come from `{until}` and only appear when the feed also
+carries a closing time as `"open_until": "21:00"` (local, 24 hour). Without it
+they are skipped, and once that time has passed they drop out too.
 
 While it is false, the rotation runs normally and nothing extra is shown.
 
@@ -121,8 +134,13 @@ Point it at anything that returns a JSON boolean:
     curl -d '{"status_url":"https://example.com/thing.json","status_key":"ready"}' \
          http://marquee.local/api/config
 
-The poll takes about 1.5 seconds and runs only while the panel is idle, so it
-never interrupts a message; the idle frame simply holds while it happens.
+The poll takes about half a second (the TLS handshake) and only runs while the
+panel shows something still: the clock, a solid fill or a held frame. It never
+interrupts a message. If nothing still comes along for two minutes it runs at
+the start of the next idle entry. A failed poll is retried after 30 s, then
+60 s, 2 min and so on up to the normal interval, and a value nobody has
+confirmed for 30 minutes is treated as unknown, so a dead network cannot leave
+OPEN on the panel all night.
 Nested keys are matched by name anywhere in the document, and string values are
 skipped, which is how the real `"open": true` is told apart from the
 `"icon": {"open": "...png"}` field in the same file.
@@ -137,6 +155,13 @@ skipped, which is how the real `"open": true` is told apart from the
 
 `POST /api/status/poll` forces a poll right away.
 
+Something else can also tell the panel instead of waiting for a poll:
+
+    curl -d '{"open":true,"open_until":"21:00"}' http://marquee.local/api/status
+
+While pushes keep arriving (at least one per two poll intervals) the panel does
+not poll at all.
+
 ## HTTP
 
 | Method | Path | Purpose |
@@ -149,6 +174,7 @@ skipped, which is how the real `"open": true` is told apart from the
 | GET | `/api/rotate` | The idle rotation document |
 | POST | `/api/rotate` | Replace it: `{"ms":15000,"items":[...],"open":{...}}` |
 | POST | `/api/status/poll` | Poll the status endpoint now |
+| POST | `/api/status` | Push the value: `{"open":true,"open_until":"21:00"}` |
 | GET | `/api/anim` | List stored animations |
 | POST | `/api/anim?name=X&fps=N` | Start a new stored animation |
 | POST | `/api/anim/frame?name=X` | Append one frame, body in base64 or hex |
@@ -161,6 +187,23 @@ Query parameters mirror the JSON fields, so a browser address bar works:
     http://marquee.local/api/cmd?say=hello&color=%23ff0044&repeat=2
 
 `POST /api/rotate` with `"open": false` turns the status entry off.
+
+Every reply carries `Access-Control-Allow-Origin: *`, and `OPTIONS` preflights
+answer with `Access-Control-Allow-Private-Network: true`, so a page served from
+elsewhere (the [hosted console](https://heatsynclabs.github.io/marquee/)) can
+drive the panel.
+
+`/api/state` also reports how the panel is doing:
+
+| Field | Meaning |
+|-------|---------|
+| `fw` | Firmware version |
+| `reset_reason` | Why it last booted (`Power On`, `Software/System restart`, `Exception`, `Hardware Watchdog` ...) |
+| `free_heap`, `max_block`, `heap_frag` | Free memory, the largest piece of it, and fragmentation in percent |
+| `loop_max_ms` | Longest single pass of the main loop in the last minute. A status poll shows up here as about 500. |
+| `wifi_drops` | Times Wi-Fi dropped since boot |
+| `led_pushes` | Frames actually sent to the LEDs (unchanged frames are skipped) |
+| `time`, `time_synced`, `tz` | Local time as the clock sees it |
 
 ## WebSocket
 
@@ -228,7 +271,7 @@ of about 1 KB.
 | `ssid`, `pass` | from the setup portal | Wi-Fi credentials, `pass` is never returned |
 | `brightness` | 60 | 0-255 |
 | `power_ma` | 800 | Supply budget, `0` disables the limiter |
-| `tz` | `PST8PDT,M3.2.0,M11.1.0` | POSIX timezone for the clock |
+| `tz` | `MST7` | POSIX timezone for the clock. Arizona does not observe daylight saving; elsewhere use e.g. `PST8PDT,M3.2.0,M11.1.0`. Applies immediately. |
 | `status_*` | see above | Status polling |
 | `clasp_enabled` | false | Connect to a CLASP relay |
 | `clasp_url` | `wss://relay.clasp.to` | Relay URL, `ws://` or `wss://` |
