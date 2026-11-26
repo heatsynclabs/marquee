@@ -70,12 +70,13 @@ the frame would draw more than `power_ma`.
 Built in: `off`, `solid`, `rainbow`, `plasma`, `fire`, `rain`, `sparkle`,
 `comet`, `chase`, `breathe`, `confetti`, `clock`, `robot`.
 
-`robot` is a small character routine: an 8 pixel tall robot (white head,
-blue body) walks in, waves, hops and walks off, then its face flies across
-trailing rainbow stripes (the trans flag on about one appearance in three),
-then it walks again. It uses no warm colours: the panel's gamma pushes orange
-toward red. One full routine is about 23.3 s, so give it
-`"hold": 23500` in the rotation to let it finish.
+`robot` is a small character routine. First the robot's face sits between
+two turning gears, looks at each, gets to work (the gears speed up, sparks fly
+off its antenna, it chatters) and smiles as they wind down. Then it flies
+right to left trailing a long tail of rainbow stripes (the trans flag on about
+one appearance in three). It uses no warm colours: the panel's gamma pushes
+orange toward red. One full routine is 16.8 s, so give it `"hold": 16800` in
+the rotation to let it finish.
 
 `solid`, `sparkle`, `comet`, `chase` and `breathe` use `color`. `clock` reads
 the time over NTP and shows `HH:MM`, which fills the panel exactly.
