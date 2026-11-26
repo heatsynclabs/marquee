@@ -20,10 +20,11 @@ class Matrix {
   uint32_t get(int x, int y) const;
 
   // Draws with the top of the glyph at y. Returns the x advance.
-  int text(int x, int y, const char* s, uint32_t color);
+  // Proportional unless mono, which keeps every glyph five columns wide.
+  int text(int x, int y, const char* s, uint32_t color, bool mono = false);
   // Same, but each column takes its hue from x, giving a rainbow fill.
   int textRainbow(int x, int y, const char* s, uint16_t hue);
-  static int textWidth(const char* s);
+  static int textWidth(const char* s, bool mono = false);
 
   // Copies raw RGB bytes into the buffer starting at a pixel offset.
   void blit(const uint8_t* rgb, size_t bytes, size_t firstPixel = 0);

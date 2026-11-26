@@ -11,6 +11,12 @@
 #include "robot.h"
 #include <math.h>
 
+#ifndef TRANS_BLUE
+#define TRANS_BLUE  0x9CE4FF
+#define TRANS_PINK  0xFFB4C8
+#define TRANS_WHITE 0xFFF4EC
+#endif
+
 namespace {
 
 const int W = Matrix::W;
@@ -20,11 +26,28 @@ const int SW = 8, SH = 8;  // the face fills the panel's height
 // --- colors -------------------------------------------------------------------
 // No red, orange or yellow on the robot: the panel's gamma pushes orange
 // toward red, and the rainbow is full of warm colors already.
-const uint32_t kFaceBlue = 0x3C8CFF;
 const uint32_t kEye      = 0xF0FFFF;
 const uint32_t kSteel    = 0xC8CCD0;
-const uint32_t kGear     = 0xA8B4C0;
 const uint32_t kCyan     = 0x20E0FF;
+
+// Each appearance picks a face color and a gear color, so it looks a little
+// different every time it comes around. All cool tones on the face.
+const uint32_t kFaceColors[] = {0x3C8CFF, 0x9060FF, 0x00C8A0, 0x30D050, 0xE040E0, 0x00B0E0};
+const uint32_t kGearColors[] = {0xC8D0D8, 0xFFC830, 0x80FFC0, 0xC0A0FF, 0xA0E8FF};
+uint32_t faceColor = kFaceColors[0];
+uint32_t gearTeeth = kGearColors[0];
+uint32_t gearBody  = 0x8C9298;
+
+uint32_t dim(uint32_t c, uint8_t keep) {
+  return ((((c >> 16) & 0xFF) * keep >> 8) << 16) | ((((c >> 8) & 0xFF) * keep >> 8) << 8) |
+         ((c & 0xFF) * keep >> 8);
+}
+
+void pickColors(uint32_t n) {
+  faceColor = kFaceColors[n % (sizeof kFaceColors / sizeof kFaceColors[0])];
+  gearTeeth = kGearColors[(n * 3 + 1) % (sizeof kGearColors / sizeof kGearColors[0])];
+  gearBody  = dim(gearTeeth, 180);
+}
 
 // --- the face -----------------------------------------------------------------
 // Drawn without its eyes and mouth, which change with what it is doing.
@@ -42,7 +65,7 @@ void face(Matrix& m, int x, Eyes eyes, Mouth mouth, bool sparks, uint32_t ms) {
     for (int c = 0; c < SW; c++) {
       const char ch = kFace[r][c];
       uint32_t col = 0;
-      if (ch == 'f') col = kFaceBlue;
+      if (ch == 'f') col = faceColor;
       else if (ch == 'l') col = kSteel;
       else if (ch == 'a') col = sparks ? 0xFFFFFF : ((ms / 400) & 1 ? kCyan : 0x0A3848);
       if (col) m.pixel(x + c, r, col);
@@ -125,7 +148,7 @@ void gear(Matrix& m, int x, uint8_t phase) {
     const uint8_t zone = gearZone[i];
     if (!zone || zone == 3) continue;
     if (zone == 1 && (uint8_t)(gearAngle[i] * 8 + phase) >= 128) continue;
-    m.pixel(x + i % GW, i / GW, zone == 2 ? kGear : kSteel);
+    m.pixel(x + i % GW, i / GW, zone == 2 ? gearBody : gearTeeth);
   }
 }
 
@@ -175,8 +198,10 @@ void workshop(Matrix& m, uint32_t t, uint32_t ms) {
 // --- the flight ---------------------------------------------------------------
 const uint32_t kRainbow[6] = {0xFF0000, 0xFF7000, 0xFFE000, 0x00D040, 0x0060FF, 0x9000E0};
 // Trans pride flag, light blue / pink / white / pink / light blue, laid over
-// six rows so it stays symmetric.
-const uint32_t kTrans[6] = {0x3CB4FF, 0xFF5A9A, 0xFFFFFF, 0xFFFFFF, 0xFF5A9A, 0x3CB4FF};
+// six rows so it stays symmetric. Lighter than the flag's own values on
+// purpose: after the panel's gamma, #5BCEFA comes out deep blue and #F5A9B8
+// magenta, so these are lifted until they read as light blue and pink.
+const uint32_t kTrans[6] = {TRANS_BLUE, TRANS_PINK, TRANS_WHITE, TRANS_WHITE, TRANS_PINK, TRANS_BLUE};
 
 const int kTrail = 40;     // longer than the panel
 const int kFlySpeed = 10;  // px/s
@@ -210,6 +235,7 @@ void fly(Matrix& m, uint32_t t, uint32_t ms, bool trans) {
 
 uint32_t lastT = 0;
 uint32_t appearances = 0;
+bool started = false;
 
 }  // namespace
 
@@ -218,7 +244,11 @@ const uint32_t Robot::kCycleMs = kShopMs + kFlyMs;
 void Robot::render(Matrix& m, uint32_t elapsed, uint32_t ms) {
   // A new appearance starts at elapsed 0; count them so the flag comes up
   // now and then rather than every time.
-  if (elapsed < lastT) appearances++;
+  if (elapsed < lastT || !started) {
+    if (started) appearances++;
+    started = true;
+    pickColors(appearances);
+  }
   lastT = elapsed;
 
   m.clear();

@@ -39,7 +39,7 @@
 #define STATUS_TLS_BUFFER    4096  // BearSSL receive buffer for the poll
 // OPEN held still (it fits), then the whole sentence in one smooth scroll.
 // {until} becomes "UNTIL 9 PM" when the feed has "open_until", else is dropped.
-#define DEFAULT_STATUS_CARDS "OPEN|OPEN HOURS - WE'RE OPEN - COME IN - {until}"
+#define DEFAULT_STATUS_CARDS "OPEN|OPEN HOURS, WE'RE OPEN, COME IN {until}"
 #define DEFAULT_STATUS_COLOR "#33ff66"
 
 // --- CLASP relay ------------------------------------------------------------
@@ -79,4 +79,4 @@
 // text can go while every frame still moves by exactly one column.
 #define DEFAULT_SPEED   30
 
-#define FW_VERSION "1.4.0"
+#define FW_VERSION "1.4.1"

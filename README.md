@@ -108,11 +108,13 @@ watches is true, mixes an extra entry into the rotation every other turn:
     clock -> OPEN HOURS ... -> HEATSYNC LABS -> OPEN HOURS ... -> robot -> ...
 
 The open entry holds OPEN still for two seconds (it fits the panel), then
-scrolls the whole sentence once: OPEN HOURS - WE'RE OPEN - COME IN, followed by
+scrolls the whole sentence once: OPEN HOURS, WE'RE OPEN, COME IN, followed by
 UNTIL 9 PM when the feed also says when the lab closes
-(`"open_until": "21:00"`). The panel is 30 pixels wide, five letters, so a
+(`"open_until": "21:00"`). The panel is 30 pixels wide, about five letters, so a
 short word can stand still and anything longer reads best as one smooth
-scroll.
+scroll. Text is spaced proportionally (a space is two pixels, narrow letters
+and punctuation take only their own width); the clock stays fixed width so
+its digits do not shift.
 
 Out of the box it reads `https://members.heatsynclabs.org/space_api.json` and
 watches `open`, the same SpaceAPI document the HeatSync Labs website uses for

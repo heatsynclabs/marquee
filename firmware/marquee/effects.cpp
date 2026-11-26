@@ -156,7 +156,7 @@ void clock(Matrix& m, uint32_t ms, uint32_t color) {
     const bool colon = tv.tv_usec < 500000;
     snprintf(buf, sizeof buf, "%02d%c%02d", tm.tm_hour, colon ? ':' : ' ', tm.tm_min);
   }
-  m.text(0, 0, buf, color);
+  m.text(0, 0, buf, color, true);  // fixed width so the digits stay put
 }
 
 }  // namespace

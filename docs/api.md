@@ -122,7 +122,7 @@ While `open` is true, the `open` item appears every `status_every` turns of the
 rotation, so it keeps coming back around between everything else. By default it
 holds OPEN still, then scrolls the sentence once:
 
-    OPEN  (still, 2 s)  ->  OPEN HOURS - WE'RE OPEN - COME IN - UNTIL 9 PM  (scrolls)
+    OPEN  (still, 2 s)  ->  OPEN HOURS, WE'RE OPEN, COME IN UNTIL 9 PM  (scrolls)
 
     clock -> (open frames) -> HEATSYNC LABS -> (open frames) -> robot -> ...
 

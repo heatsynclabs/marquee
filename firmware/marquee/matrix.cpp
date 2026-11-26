@@ -60,38 +60,61 @@ static uint8_t glyphColumn(char ch, int col) {
   return pgm_read_byte(&FONT5X7[(ch - 32) * FONT_W + col]);
 }
 
-int Matrix::textWidth(const char* s) {
-  int n = strlen(s);
-  return n ? n * (FONT_W + 1) - 1 : 0;
+// Proportional spacing: a glyph takes only the columns it lights, a space
+// is two, and one blank column separates letters. The font is monospaced, so
+// without this a space or a comma leaves a six-pixel hole. mono keeps every
+// glyph five wide, for the clock, whose digits would otherwise shift.
+static const int kSpaceW = 2;
+
+static void glyphSpan(char ch, bool mono, int& first, int& width) {
+  if (mono) { first = 0; width = FONT_W; return; }
+  int lo = FONT_W, hi = -1;
+  for (int c = 0; c < FONT_W; c++)
+    if (glyphColumn(ch, c)) { if (lo == FONT_W) lo = c; hi = c; }
+  if (hi < 0) { first = 0; width = kSpaceW; return; }
+  first = lo;
+  width = hi - lo + 1;
 }
 
-int Matrix::text(int x, int y, const char* s, uint32_t color) {
-  int x0 = x;
+int Matrix::textWidth(const char* s, bool mono) {
+  int w = 0;
   for (const char* p = s; *p; p++) {
-    for (int c = 0; c < FONT_W; c++, x++) {
-      if (x < 0 || x >= W) continue;
-      uint8_t bits = glyphColumn(*p, c);
-      for (int r = 0; r < FONT_H; r++)
-        if (bits & (1 << r)) pixel(x, y + r, color);
+    int first, width;
+    glyphSpan(*p, mono, first, width);
+    w += width + 1;
+  }
+  return w ? w - 1 : 0;
+}
+
+// Draws with the top of the glyph at y; colorAt(x) picks each column's color.
+template <typename ColorAt>
+static int drawText(Matrix& m, int x, int y, const char* s, bool mono, ColorAt colorAt) {
+  const int x0 = x;
+  for (const char* p = s; *p; p++) {
+    int first, width;
+    glyphSpan(*p, mono, first, width);
+    if (x + width > 0 && x < Matrix::W) {
+      for (int c = 0; c < width; c++) {
+        const int px = x + c;
+        if (px < 0 || px >= Matrix::W || first + c >= FONT_W) continue;
+        const uint8_t bits = glyphColumn(*p, first + c);
+        if (!bits) continue;
+        const uint32_t col = colorAt(px);
+        for (int r = 0; r < FONT_H; r++)
+          if (bits & (1 << r)) m.pixel(px, y + r, col);
+      }
     }
-    x++;  // one column of spacing
+    x += width + 1;
   }
   return x - x0;
+}
+
+int Matrix::text(int x, int y, const char* s, uint32_t color, bool mono) {
+  return drawText(*this, x, y, s, mono, [color](int) { return color; });
 }
 
 int Matrix::textRainbow(int x, int y, const char* s, uint16_t hue) {
-  int x0 = x;
-  for (const char* p = s; *p; p++) {
-    for (int c = 0; c < FONT_W; c++, x++) {
-      if (x < 0 || x >= W) continue;
-      uint32_t col = hsv(hue + x * 40, 255, 255);
-      uint8_t bits = glyphColumn(*p, c);
-      for (int r = 0; r < FONT_H; r++)
-        if (bits & (1 << r)) pixel(x, y + r, col);
-    }
-    x++;
-  }
-  return x - x0;
+  return drawText(*this, x, y, s, false, [hue](int px) { return hsv(hue + px * 40, 255, 255); });
 }
 
 // FNV-1a over the frame and the settings that change what reaches the LEDs.
