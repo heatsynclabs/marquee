@@ -1,5 +1,5 @@
 // Marquee: a network-controlled LED matrix.
-// https://github.com/  (see README.md)
+// https://github.com/heatsynclabs/marquee (see README.md)
 
 #include <LittleFS.h>
 
@@ -7,6 +7,7 @@
 #include "commands.h"
 #include "config.h"
 #include "effects.h"
+#include "health.h"
 #include "matrix.h"
 #include "net.h"
 #include "player.h"
@@ -55,7 +56,8 @@ void setup() {
   Serial.begin(115200);
   Serial.println("\n\nmarquee");
 
-  LittleFS.begin();
+  Health::begin();
+  LittleFS.begin();  // formats itself if the filesystem is unreadable
   settings.load();
   guardStart();
 
@@ -68,7 +70,7 @@ void setup() {
   ClaspLink::begin();
   Status::begin();
 
-  if (Net::apMode()) {
+  if (!settings.ssid[0]) {
     Item msg;
     msg.kind = Item::Text;
     strlcpy(msg.arg, "SETUP - JOIN WIFI marquee-setup", sizeof msg.arg);
@@ -85,6 +87,7 @@ void setup() {
 }
 
 void loop() {
+  Health::loopStart();
   Net::loop();
   Web::loop();
   ClaspLink::loop();
@@ -92,9 +95,13 @@ void loop() {
   settings.tick();
   guardSettle();
 
-  if (millis() - lastFrame >= FRAME_MS) {
-    lastFrame = millis();
+  // Fixed frame clock. After a long pause (a status poll), skip ahead rather
+  // than rush to catch up; animations follow the real clock anyway.
+  const uint32_t now = millis();
+  if (now - lastFrame >= FRAME_MS) {
+    lastFrame = (now - lastFrame > 3 * FRAME_MS) ? now : lastFrame + FRAME_MS;
     player.tick(matrix);
     matrix.show();
   }
+  Health::loopEnd();
 }

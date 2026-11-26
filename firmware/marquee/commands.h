@@ -7,7 +7,10 @@
 
 namespace Commands {
 bool     apply(JsonObjectConst cmd, String& err);
-bool     applyJson(const String& json, String& err);  // object or array
+bool     applyJson(const char* json, size_t len, String& err);  // object or array
+inline bool applyJson(const String& json, String& err) {
+  return applyJson(json.c_str(), json.length(), err);
+}
 void     state(JsonDocument& out);
 uint32_t parseColor(const char* s, bool* rainbow = nullptr);
 

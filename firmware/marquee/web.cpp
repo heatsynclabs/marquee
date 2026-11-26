@@ -21,6 +21,23 @@ WiFiUDP           udp;
 uint8_t           packet[Matrix::N * 3 + 8];
 
 const size_t kFrameBytes = Matrix::N * 3;
+uint32_t lastWsFrame = 0;
+
+// Lets a page served from elsewhere (the GitHub Pages console) call the API.
+// Browsers ask first with OPTIONS; Chrome's private network checks also want
+// Access-Control-Allow-Private-Network on that answer.
+class Preflight : public esp8266webserver::RequestHandler<WiFiServer> {
+ public:
+  bool canHandle(HTTPMethod method, const String&) override { return method == HTTP_OPTIONS; }
+  bool handle(ESP8266WebServer& server, HTTPMethod, const String&) override {
+    server.sendHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+    server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+    server.sendHeader("Access-Control-Allow-Private-Network", "true");
+    server.sendHeader("Access-Control-Max-Age", "600");
+    server.send(204);
+    return true;
+  }
+};
 
 void sendJson(int code, JsonDocument& doc) {
   String out;
@@ -77,14 +94,6 @@ size_t decodeFrame(const String& in, uint8_t* out, size_t cap, size_t expect) {
     }
   }
   return w;
-}
-
-// The Arduino String has no buffer+length constructor.
-String toString(const uint8_t* p, size_t n) {
-  String s;
-  s.reserve(n + 1);
-  for (size_t i = 0; i < n; i++) s += (char)p[i];
-  return s;
 }
 
 // curl -d sends a form content type unless told otherwise, and the server then
@@ -178,6 +187,7 @@ void handleConfigPost() {
   if (doc["status_poll_s"].is<int>()) settings.statusPollS = doc["status_poll_s"].as<int>();
   if (doc["status_every"].is<int>()) settings.statusEvery = doc["status_every"].as<int>();
   if (doc["status_url"].is<const char*>() || doc["status_key"].is<const char*>()) Status::pollNow();
+  if (doc["tz"].is<const char*>()) Net::applyTime();
   settings.save();
 
   bool reboot = doc["reboot"] | false;
@@ -208,6 +218,16 @@ void handleRotatePost() {
 
 void handleStatusPoll() {
   Status::pollNow();
+  sendOk();
+}
+
+// POST /api/status {"open":true,"open_until":"21:00"}: someone else (the
+// members site) tells the panel instead of waiting for the next poll.
+void handleStatusPush() {
+  JsonDocument doc;
+  if (deserializeJson(doc, bodyJson())) return sendErr(400, "bad JSON");
+  if (!doc["open"].is<bool>()) return sendErr(400, "open must be true or false");
+  Status::push(doc["open"].as<bool>(), doc["open_until"] | "");
   sendOk();
 }
 
@@ -282,30 +302,37 @@ void handleRoot() {
 
 void onWsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t len) {
   if (type == WStype_TEXT) {
-    String err, body = toString(payload, len);
-    if (!Commands::applyJson(body, err)) {
-      String reply = String("{\"ok\":false,\"error\":\"") + err + "\"}";
-      ws.sendTXT(num, reply);
+    String err;
+    if (!Commands::applyJson((const char*)payload, len, err)) {
+      JsonDocument r;
+      r["ok"] = false;
+      r["error"] = err;
+      char out[96];
+      size_t n = serializeJson(r, out, sizeof out);
+      ws.sendTXT(num, out, n);
     }
   } else if (type == WStype_BIN && len == kFrameBytes) {
+    // A drawing page can send a frame per pointer move; 50 a second is plenty.
+    if (millis() - lastWsFrame < 20) return;
+    lastWsFrame = millis();
     matrix.blit(payload, len);
     player.realtimeFrame(2000);
   }
 }
 
 // WLED-compatible realtime UDP, plus plain JSON commands on the same port.
-void handleUdp() {
+bool handleUdp() {
   int size = udp.parsePacket();
-  if (size <= 0) return;
+  if (size <= 0) return false;
   int n = udp.read(packet, sizeof packet);
-  if (n <= 0) return;
+  if (n <= 0) return true;
 
-  if (packet[0] == '{') {
-    String err, body = toString(packet, n);
-    Commands::applyJson(body, err);
-    return;
+  if (packet[0] == '{' || packet[0] == '[') {
+    String err;
+    Commands::applyJson((const char*)packet, n, err);
+    return true;
   }
-  if (n < 2) return;
+  if (n < 2) return true;
 
   const uint8_t proto = packet[0];
   const uint32_t timeout = (packet[1] ? packet[1] : 2) * 1000UL;
@@ -318,18 +345,21 @@ void handleUdp() {
   } else if (proto == 2) {  // DRGB: pixels from zero
     matrix.blit(d, avail);
   } else if (proto == 4) {  // DNRGB: u16 start index, then pixels
-    if (avail < 2) return;
+    if (avail < 2) return true;
     uint16_t start = (d[0] << 8) | d[1];
     matrix.blit(d + 2, avail - 2, start);
   } else {
-    return;
+    return true;
   }
   player.realtimeFrame(timeout);
+  return true;
 }
 
 }  // namespace
 
 void Web::begin() {
+  http.enableCORS(true);  // Access-Control-Allow-Origin: * on every reply
+  http.addHandler(new Preflight());
   http.on("/", handleRoot);
   http.on("/api/state", handleState);
   http.on("/api/cmd", handleCmd);
@@ -338,6 +368,7 @@ void Web::begin() {
   http.on("/api/rotate", HTTP_GET, handleRotateGet);
   http.on("/api/rotate", HTTP_POST, handleRotatePost);
   http.on("/api/status/poll", HTTP_POST, handleStatusPoll);
+  http.on("/api/status", HTTP_POST, handleStatusPush);
   http.on("/api/anim", HTTP_GET, handleAnimList);
   http.on("/api/anim", HTTP_POST, handleAnimNew);
   http.on("/api/anim", HTTP_DELETE, handleAnimDelete);
@@ -356,6 +387,9 @@ void Web::begin() {
 
   ws.begin();
   ws.onEvent(onWsEvent);
+  // Phones that sleep leave dead sockets behind. Ping every 15 s and drop a
+  // client that misses two, so the slots never fill up with ghosts.
+  ws.enableHeartbeat(15000, 3000, 2);
 
   udp.begin(UDP_PORT);
 }
@@ -363,5 +397,8 @@ void Web::begin() {
 void Web::loop() {
   http.handleClient();
   ws.loop();
-  handleUdp();
+  // Drain a burst of realtime packets; only the newest frame matters.
+  for (int i = 0; i < 4; i++) {
+    if (!handleUdp()) break;
+  }
 }

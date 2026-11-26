@@ -8,6 +8,9 @@
 #include "config.h"
 #include <ESP8266WiFi.h>
 #include <LittleFS.h>
+#include <sys/time.h>
+#include "health.h"
+#include "net.h"
 
 namespace {
 
@@ -69,8 +72,28 @@ int Commands::buildItem(JsonObjectConst cmd, Item& it, String& err) {
   if (!text) text = cmd["say"].as<const char*>();
   const char* anim = cmd["anim"].as<const char*>();
   const char* play = cmd["play"].as<const char*>();
+  JsonVariantConst cards = cmd["cards"];
 
-  if (text) {
+  if (!cards.isNull()) {
+    it.kind = Item::Cards;
+    if (cards.is<const char*>()) {
+      strlcpy(it.arg, cards.as<const char*>(), sizeof it.arg);
+    } else if (cards.is<JsonArrayConst>()) {
+      size_t w = 0;
+      for (JsonVariantConst c : cards.as<JsonArrayConst>()) {
+        const char* word = c.as<const char*>();
+        if (!word) continue;
+        size_t n = strlen(word);
+        if (w + n + 2 > sizeof it.arg) break;
+        if (w) it.arg[w++] = '|';
+        memcpy(it.arg + w, word, n);
+        w += n;
+      }
+      it.arg[w] = 0;
+    }
+    if (!it.arg[0]) { err = "cards needs at least one word"; return -1; }
+    it.color = 0x33FF66;
+  } else if (text) {
     it.kind = Item::Text;
     strlcpy(it.arg, text, sizeof it.arg);
   } else if (anim) {
@@ -96,6 +119,7 @@ int Commands::buildItem(JsonObjectConst cmd, Item& it, String& err) {
   it.speed   = cmd["speed"] | it.speed;
   it.repeat  = cmd["repeat"] | 1;
   it.hold    = cmd["hold"] | 0U;
+  if (it.hold > 3600000UL) it.hold = 3600000UL;
   it.fps     = cmd["fps"] | 0;
   return 1;
 }
@@ -165,9 +189,11 @@ bool Commands::apply(JsonObjectConst cmd, String& err) {
   return true;
 }
 
-bool Commands::applyJson(const String& json, String& err) {
+bool Commands::applyJson(const char* json, size_t len, String& err) {
+  if (!json || !len) { err = "empty"; return false; }
+  if (len > 4096) { err = "too long"; return false; }
   JsonDocument doc;
-  DeserializationError e = deserializeJson(doc, json);
+  DeserializationError e = deserializeJson(doc, json, len);
   if (e) { err = e.c_str(); return false; }
   if (doc.is<JsonArrayConst>()) {
     for (JsonObjectConst o : doc.as<JsonArrayConst>())
@@ -181,10 +207,30 @@ bool Commands::applyJson(const String& json, String& err) {
 void Commands::state(JsonDocument& out) {
   const Item& c = player.current();
   out["host"]       = settings.host;
+  out["fw"]         = FW_VERSION;
   out["ip"]         = WiFi.localIP().toString();
   out["rssi"]       = WiFi.RSSI();
   out["uptime_s"]   = millis() / 1000;
   out["free_heap"]  = ESP.getFreeHeap();
+  out["max_block"]  = ESP.getMaxFreeBlockSize();
+  out["heap_frag"]  = ESP.getHeapFragmentation();
+  out["reset_reason"] = Health::resetReason();
+  out["wifi_drops"] = Net::reconnects();
+  out["loop_max_ms"] = Health::loopMaxMs();
+  out["led_pushes"] = matrix.pushes();
+
+  struct timeval tv;
+  gettimeofday(&tv, nullptr);
+  out["time_synced"] = tv.tv_sec > 1700000000;
+  if (tv.tv_sec > 1700000000) {
+    char t[24];
+    struct tm tm;
+    time_t now = tv.tv_sec;
+    localtime_r(&now, &tm);
+    strftime(t, sizeof t, "%Y-%m-%d %H:%M:%S", &tm);
+    out["time"] = t;  // char array: copied
+  }
+  out["tz"]         = settings.tz;
   out["width"]      = Matrix::W;
   out["height"]     = Matrix::H;
   out["brightness"] = settings.brightness;
@@ -203,9 +249,12 @@ void Commands::state(JsonDocument& out) {
   st["age_s"]       = Status::lastPollS();
   st["poll_ms"]     = Status::lastPollMs();
   st["last"]        = Status::lastError();
+  st["until"]       = Status::untilRaw();
 
   JsonObject cur = out["current"].to<JsonObject>();
-  cur["kind"] = c.kind == Item::Text ? "text" : (c.kind == Item::Stored ? "stored" : "anim");
+  cur["kind"] = c.kind == Item::Text ? "text"
+              : c.kind == Item::Stored ? "stored"
+              : c.kind == Item::Cards ? "cards" : "anim";
   cur["arg"]  = c.kind == Item::Effect ? Effects::name(c.effect) : c.arg;
 
   JsonDocument rot;
@@ -246,6 +295,12 @@ static void itemJson(const Item& it, JsonObject o) {
       if (it.speed != 20) o["speed"] = it.speed;
       if (it.repeat != 1) o["repeat"] = it.repeat;
       if (!it.scroll) o["scroll"] = false;
+      break;
+    case Item::Cards:
+      o["cards"] = it.arg;
+      if (it.rainbow) o["color"] = "rainbow";
+      else o["color"] = hex;
+      if (it.repeat != 1) o["repeat"] = it.repeat;
       break;
     case Item::Stored:
       o["play"] = it.arg;
@@ -372,7 +427,7 @@ void Commands::loadRotation() {
   }
   if (!ok) {
     JsonDocument def;
-    def["text"] = DEFAULT_STATUS_TEXT;
+    def["cards"] = DEFAULT_STATUS_CARDS;
     def["color"] = DEFAULT_STATUS_COLOR;
     ok = buildItem(def.as<JsonObjectConst>(), statusItem, err) == 1;
   }

@@ -1,11 +1,14 @@
-// Wi-Fi, the first-boot setup portal, mDNS and OTA.
+// Wi-Fi, the setup portal, mDNS, OTA and NTP.
 #pragma once
 #include <Arduino.h>
 
 namespace Net {
 void begin();
 void loop();
-bool apMode();     // true while the setup portal is up
+void applyTime();      // (re)apply settings.tz and the NTP servers
+bool apMode();         // setup portal up and no network: serve the setup page
+bool portalOpen();
 bool online();
+uint32_t reconnects(); // times the station dropped since boot
 String ip();
 }  // namespace Net

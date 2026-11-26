@@ -94,7 +94,26 @@ int Matrix::textRainbow(int x, int y, const char* s, uint16_t hue) {
   return x - x0;
 }
 
-void Matrix::show() {
+// FNV-1a over the frame and the settings that change what reaches the LEDs.
+static uint32_t frameHash(const uint8_t* b, size_t n) {
+  uint32_t h = 2166136261u;
+  for (size_t i = 0; i < n; i++) h = (h ^ b[i]) * 16777619u;
+  h = (h ^ settings.brightness) * 16777619u;
+  h = (h ^ (settings.powerMa & 0xFF)) * 16777619u;
+  return (h ^ (settings.powerMa >> 8)) * 16777619u;
+}
+
+bool Matrix::show(bool force) {
+  // Pushing 240 pixels turns interrupts off for about 7 ms, which Wi-Fi feels.
+  // Skip identical frames, but re-push now and then in case a glitch on the
+  // data line left a pixel wrong.
+  const uint32_t h = frameHash(buf, sizeof buf);
+  const uint32_t now = millis();
+  if (!force && h == lastHash_ && now - lastPush_ < REFRESH_MS) return false;
+  lastHash_ = h;
+  lastPush_ = now;
+  pushes_++;
+
   uint8_t* out = strip.getPixels();
   uint32_t sum = 0;
   const uint16_t br = (uint16_t)settings.brightness + 1;
@@ -124,6 +143,7 @@ void Matrix::show() {
   lastMa_ = ledMa + idleMa;
 
   strip.show();
+  return true;
 }
 
 // Six-segment hue ramp. h is 0-1535, wrapping.

@@ -10,10 +10,11 @@
 #include "matrix.h"
 
 struct Item {
-  enum Kind : uint8_t { Effect, Text, Stored };
+  enum Kind : uint8_t { Effect, Text, Stored, Cards };
 
   uint8_t  kind    = Effect;
-  char     arg[128] = "";     // message text, or a stored animation name
+  char     arg[128] = "";     // message text, stored animation name, or
+                              // cards separated by | ({until} = closing time)
   int8_t   effect  = 0;       // Effects id, for kind == Effect
   uint32_t color   = 0xFFFFFF;
   bool     rainbow = false;
@@ -53,6 +54,11 @@ class Player {
 
   void tick(Matrix& m);
 
+  // The frame on screen is not moving (clock, solid, off, a static message),
+  // so a short pause in the loop would not be visible.
+  bool stillFrame() const;
+  bool justStarted() const { return millis() - start_ < 100; }
+
   const Item& current() const { return cur_; }
   bool  idleNow() const { return idle_; }
   uint8_t queued() const { return qLen_; }
@@ -63,6 +69,9 @@ class Player {
   void nextIdle();
   bool renderText(Matrix& m, uint32_t elapsed);
   bool renderStored(Matrix& m, uint32_t elapsed);
+  bool renderCards(Matrix& m, uint32_t elapsed);
+  void expandCards();
+  uint32_t cardMs(uint8_t i) const;
   uint32_t reps() const { return cur_.repeat > 0 ? (uint32_t)cur_.repeat : 1; }
 
   Item cur_;
@@ -81,6 +90,12 @@ class Player {
 
   uint32_t start_ = 0;
   uint32_t rtUntil_ = 0;
+
+  // Cards for the current item, expanded at start: NUL-separated words.
+  static const uint8_t kMaxCards = 16;
+  char     cardBuf_[160];
+  uint8_t  cardOff_[kMaxCards];
+  uint8_t  cardCount_ = 0;
 
   File     file_;
   uint16_t frames_ = 0, frameBytes_ = 0, delayMs_ = 100;

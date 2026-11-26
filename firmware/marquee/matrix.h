@@ -28,8 +28,10 @@ class Matrix {
   // Copies raw RGB bytes into the buffer starting at a pixel offset.
   void blit(const uint8_t* rgb, size_t bytes, size_t firstPixel = 0);
 
-  void show();
+  // Pushes the frame to the LEDs if it changed. Returns true when it did.
+  bool show(bool force = false);
   uint16_t lastDrawMa() const { return lastMa_; }
+  uint32_t pushes() const { return pushes_; }
 
   static uint16_t index(int x, int y);
 
@@ -37,6 +39,7 @@ class Matrix {
 
  private:
   uint16_t lastMa_ = 0;
+  uint32_t lastHash_ = 0, lastPush_ = 0, pushes_ = 0;
 };
 
 uint32_t hsv(uint16_t h, uint8_t s, uint8_t v);  // h: 0-1535 (6*256)

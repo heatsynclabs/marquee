@@ -1,11 +1,13 @@
 #include "effects.h"
+#include "robot.h"
+#include <sys/time.h>
 #include <time.h>
 
 namespace {
 
 const char* const kNames[] = {
     "off", "solid", "rainbow", "plasma", "fire", "rain",
-    "sparkle", "comet", "chase", "breathe", "confetti", "clock",
+    "sparkle", "comet", "chase", "breathe", "confetti", "clock", "robot",
 };
 const int kCount = sizeof(kNames) / sizeof(kNames[0]);
 
@@ -33,14 +35,24 @@ void rainbow(Matrix& m, uint32_t ms) {
   }
 }
 
+// The ESP8266 has no FPU: 720 sinf() calls a frame starved Wi-Fi. A 256-entry
+// sine table gives the same picture with integer maths.
+uint8_t sine[256];
+bool sineReady = false;
+
+inline uint8_t sin8(uint8_t a) { return sine[a]; }
+
 void plasma(Matrix& m, uint32_t ms) {
-  float t = ms / 900.0f;
+  if (!sineReady) {
+    for (int i = 0; i < 256; i++) sine[i] = (uint8_t)(127.5f + 127.5f * sinf(i * 2 * PI / 256));
+    sineReady = true;
+  }
+  // Angles in 1/256 turn. Same speeds and spatial frequencies as before.
+  const uint8_t t1 = ms / 22, t2 = (uint64_t)ms * 13 / 220, t3 = (uint64_t)ms * 7 / 220;
   for (int y = 0; y < H; y++)
     for (int x = 0; x < W; x++) {
-      float v = sinf(x * 0.35f + t) + sinf(y * 0.5f - t * 1.3f) +
-                sinf((x + y) * 0.22f + t * 0.7f);
-      uint16_t h = (uint16_t)((v + 3.0f) * 256.0f) % 1536;
-      m.pixel(x, y, hsv(h, 255, 255));
+      uint16_t v = sin8(x * 14 + t1) + sin8(y * 20 - t2) + sin8((x + y) * 9 + t3);
+      m.pixel(x, y, hsv((v * 2) % 1536, 255, 255));
     }
 }
 
@@ -130,13 +142,20 @@ void confetti(Matrix& m, uint32_t ms) {
 }
 
 void clock(Matrix& m, uint32_t ms, uint32_t color) {
-  time_t now = time(nullptr);
-  struct tm tm;
-  localtime_r(&now, &tm);
+  (void)ms;
+  struct timeval tv;
+  gettimeofday(&tv, nullptr);
   char buf[6];
-  bool tick = (ms / 500) & 1;
-  snprintf(buf, sizeof buf, "%02d%c%02d", tm.tm_hour, tick ? ':' : ' ', tm.tm_min);
-  if (now < 100000) strcpy(buf, "--:--");
+  if (tv.tv_sec < 1700000000) {  // NTP has not answered yet
+    strcpy(buf, "--:--");
+  } else {
+    struct tm tm;
+    time_t now = tv.tv_sec;
+    localtime_r(&now, &tm);
+    // Colon on for the first half of each real second.
+    const bool colon = tv.tv_usec < 500000;
+    snprintf(buf, sizeof buf, "%02d%c%02d", tm.tm_hour, colon ? ':' : ' ', tm.tm_min);
+  }
   m.text(0, 0, buf, color);
 }
 
@@ -155,7 +174,7 @@ int find(const char* n) {
   return -1;
 }
 
-void render(int id, Matrix& m, uint32_t ms, uint32_t color) {
+void render(int id, Matrix& m, uint32_t ms, uint32_t elapsed, uint32_t color) {
   switch (id) {
     case 0:  m.clear(); break;
     case 1:  m.fill(color); break;
@@ -169,6 +188,7 @@ void render(int id, Matrix& m, uint32_t ms, uint32_t color) {
     case 9:  breathe(m, ms, color); break;
     case 10: confetti(m, ms); break;
     case 11: m.clear(); clock(m, ms, color); break;
+    case 12: Robot::render(m, elapsed, ms); break;
     default: m.clear(); break;
   }
 }

@@ -26,7 +26,7 @@
 #define DEFAULT_HOSTNAME   "marquee"
 #define DEFAULT_BRIGHTNESS 60      // 0-255
 #define DEFAULT_POWER_MA   800     // supply budget, see README
-#define DEFAULT_TZ         "PST8PDT,M3.2.0,M11.1.0"
+#define DEFAULT_TZ         "MST7"    // Arizona: UTC-7, no daylight saving
 #define DEFAULT_ROTATE_MS  15000   // how long each idle entry stays up
 
 // --- Status poll ------------------------------------------------------------
@@ -37,7 +37,9 @@
 #define DEFAULT_STATUS_POLL  300   // seconds between polls
 #define DEFAULT_STATUS_EVERY 2     // show it every Nth idle entry while true
 #define STATUS_TLS_BUFFER    4096  // BearSSL receive buffer for the poll
-#define DEFAULT_STATUS_TEXT  "LAB OPEN"
+// Still frames, one word each, so nothing has to scroll. {until} becomes
+// UNTIL + the closing time when the feed has "open_until", else is dropped.
+#define DEFAULT_STATUS_CARDS "OPEN|HOURS|WE'RE|OPEN|COME|IN|{until}"
 #define DEFAULT_STATUS_COLOR "#33ff66"
 
 // --- CLASP relay ------------------------------------------------------------
@@ -55,4 +57,22 @@
 #define UDP_PORT  21324  // WLED-compatible realtime port
 
 // --- Timing -----------------------------------------------------------------
-#define FRAME_MS 20      // 50 fps
+// The NeoPixel driver turns interrupts off for about 7 ms per push of 240
+// pixels, and Wi-Fi needs those interrupts. 30 fps keeps that under a quarter
+// of the time, and frames that did not change are not pushed at all.
+#define FRAME_MS        33     // ~30 fps
+#define REFRESH_MS      1000   // re-push an unchanged frame this often anyway
+
+// --- Health -----------------------------------------------------------------
+// Below this largest free block the TLS poll and the web server start failing.
+// If it stays there, the panel restarts itself rather than limping on.
+#define HEAP_LOW_BLOCK  4096
+#define HEAP_LOW_MS     60000
+// Wi-Fi gone this long: restart, which clears any stuck driver state.
+#define WIFI_LOST_REBOOT_MS (10UL * 60 * 1000)
+// Never connected this long after boot: open the setup portal next to the
+// normal connection attempts, so a router that boots slowly does not strand
+// the panel in setup mode.
+#define PORTAL_AFTER_MS     (3UL * 60 * 1000)
+
+#define FW_VERSION "1.1.0"
