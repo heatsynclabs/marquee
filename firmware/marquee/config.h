@@ -75,4 +75,8 @@
 // the panel in setup mode.
 #define PORTAL_AFTER_MS     (3UL * 60 * 1000)
 
-#define FW_VERSION "1.1.0"
+// Default scroll speed. At 30 fps this is one pixel per frame: as fast as
+// text can go while every frame still moves by exactly one column.
+#define DEFAULT_SPEED   30
+
+#define FW_VERSION "1.1.1"

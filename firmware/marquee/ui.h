@@ -35,7 +35,7 @@ button.go{background:var(--accent);color:#141414;border-color:var(--accent);font
 <input id="text" class="wide" placeholder="Type something" autocomplete="off">
 <div class="row" style="margin-top:10px">
   <div style="flex:0 0 52px"><label>Color</label><input type="color" id="color" value="#ff9f43"></div>
-  <div><label>Speed</label><input id="speed" type="number" value="20" min="5" max="300"></div>
+  <div><label>Speed</label><input id="speed" type="number" value="30" min="5" max="200"></div>
   <div><label>Repeat</label><input id="repeat" type="number" value="1" min="1" max="99"></div>
   <div style="flex:0 0 auto"><label>&nbsp;</label><button class="go" onclick="say()">Send</button></div>
 </div>

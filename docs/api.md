@@ -27,7 +27,7 @@ internet.
 | `cards` | string or array | Still frames shown one after another, e.g. `"OPEN\|HOURS"` or `["OPEN","HOURS"]`. Five characters fit; a longer word scrolls once. `{until}` becomes UNTIL and the closing time, see [Status polling](#status-polling). |
 | `color` | string or number | See [Colors](#colors). |
 | `rainbow` | bool | Color the text by column instead of using `color`. |
-| `speed` | number | Scroll speed in pixels per second, 1 to 200. Default 20, which reads comfortably; 40 is brisk. |
+| `speed` | number | Scroll speed in pixels per second, 1 to 200. Default 30, one pixel per frame; above that the text starts to skip columns. |
 | `repeat` | number | How many times to play. `-1` repeats forever. Default 1. |
 | `scroll` | bool | `false` centers the text instead of scrolling. Default true. |
 | `hold` | number | Milliseconds to hold before moving on. For `cards`, how long each frame stays up (default 1100). |

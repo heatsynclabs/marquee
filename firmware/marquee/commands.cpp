@@ -292,7 +292,7 @@ static void itemJson(const Item& it, JsonObject o) {
       // linked, and hex is about to go out of scope.
       if (it.rainbow) o["color"] = "rainbow";
       else o["color"] = hex;
-      if (it.speed != 20) o["speed"] = it.speed;
+      if (it.speed != DEFAULT_SPEED) o["speed"] = it.speed;
       if (it.repeat != 1) o["repeat"] = it.repeat;
       if (!it.scroll) o["scroll"] = false;
       break;

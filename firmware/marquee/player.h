@@ -7,6 +7,7 @@
 #pragma once
 #include <Arduino.h>
 #include <LittleFS.h>
+#include "config.h"
 #include "matrix.h"
 
 struct Item {
@@ -19,7 +20,7 @@ struct Item {
   uint32_t color   = 0xFFFFFF;
   bool     rainbow = false;
   bool     scroll  = true;
-  uint16_t speed   = 20;      // pixels per second
+  uint16_t speed   = DEFAULT_SPEED;  // pixels per second
   int16_t  repeat  = 1;       // -1 repeats forever
   uint32_t hold    = 0;       // ms; 0 means "derive from repeat"
   uint16_t fps     = 0;       // stored animation override
