@@ -1,6 +1,6 @@
 // A robot that lives on the panel: it walks in, waves, hops and walks off,
-// then flies across on a jetpack trailing stripes. About one appearance in
-// three the stripes are the trans flag instead of the rainbow.
+// then its face flies across trailing stripes. About one appearance in three
+// the stripes are the trans flag instead of the rainbow.
 //
 // Everything is an 8x8 sprite drawn from strings plus integer maths, so it
 // costs less than the clock.
@@ -12,39 +12,50 @@ const int W = Matrix::W;
 const int H = Matrix::H;
 const int SW = 8, SH = 8;  // the full height of the panel
 
-// Sprite rows, top to bottom. Letters pick colors from ink().
-//   a antenna tip   h head   e eye   b body   r arm   l leg   f flame
+// Sprite rows, top to bottom. Letters pick colors from ink(); '.' is unlit,
+// which is also how the eyes and mouth are drawn: dark on a lit face reads
+// best on LEDs.
+//   a antenna tip   h head   b body   c chest light   l arms and legs
 const char* const kWalkA[SH] = {
-    "....a...", ".hhhhhh.", ".hehheh.", ".hhhhhh.",
-    "rbbbbbbr", "rbbbbbbr", ".bbbbbb.", ".ll..ll.",
+    "....a...", ".hhhhhh.", ".h.hh.h.", ".hhhhhh.",
+    "lbbccbbl", "lbbbbbbl", ".bbbbbb.", ".ll..ll.",
 };
 const char* const kWalkB[SH] = {
-    "....a...", ".hhhhhh.", ".hehheh.", ".hhhhhh.",
-    "rbbbbbbr", "rbbbbbbr", ".bbbbbb.", "...ll...",
+    "....a...", ".hhhhhh.", ".h.hh.h.", ".hhhhhh.",
+    "lbbccbbl", "lbbbbbbl", ".bbbbbb.", "...ll...",
 };
 const char* const kWaveUp[SH] = {
-    "....a..r", ".hhhhhhr", ".hehhehr", ".hhhhhhr",
-    "rbbbbbb.", "rbbbbbb.", ".bbbbbb.", ".ll..ll.",
+    "....a...", ".hhhhhhl", ".h.hh.hl", ".hhhhhhl",
+    "lbbccbbl", "lbbbbbb.", ".bbbbbb.", ".ll..ll.",
 };
 const char* const kWaveDown[SH] = {
-    "....a...", ".hhhhhh.", ".hehheh.", ".hhhhhhr",
-    "rbbbbbbr", "rbbbbbb.", ".bbbbbb.", ".ll..ll.",
+    "....a...", ".hhhhhh.", ".h.hh.h.", ".hhhhhhl",
+    "lbbccbbl", "lbbbbbb.", ".bbbbbb.", ".ll..ll.",
 };
-const char* const kFly[SH] = {
-    "....a...", ".hhhhhh.", ".hehheh.", ".hhhhhhr",
-    "fbbbbbbr", "fbbbbbb.", "fbbbbbb.", "ll......",
+// The face that flies with the trail: a blue head with glowing eyes, a grille
+// mouth, bolts on the sides and the antenna.
+//   f face   e eye   g grille   l bolt
+const char* const kFace[SH] = {
+    "...aa...", ".ffffff.", ".ffffff.", "lfeffefl",
+    "lfeffefl", ".ffffff.", ".fgfgff.", ".ffffff.",
+};
+const char* const kFaceBlink[SH] = {
+    "...aa...", ".ffffff.", ".ffffff.", "lffffffl",
+    "lfeffefl", ".ffffff.", ".fgfgff.", ".ffffff.",
 };
 
-// No red anywhere on the robot.
+// No red, orange or yellow on the robot: the panel's gamma pushes orange
+// toward red, and the rainbow is full of warm colors already.
 uint32_t ink(char c, uint32_t ms) {
   switch (c) {
     case 'a': return (ms / 400) & 1 ? 0x20E0FF : 0x0A3848;  // blinking tip
-    case 'h': return 0xB8C4CC;
-    case 'e': return 0x20E0FF;
-    case 'b': return 0xFF9F43;                               // HeatSync orange
-    case 'r': return 0xB8C4CC;
-    case 'l': return 0x8090A0;
-    case 'f': return (ms / 80) & 1 ? 0xFFE040 : 0xFFFFC0;    // flicker
+    case 'h': return 0xF0F4F8;
+    case 'b': return 0x3C8CFF;
+    case 'c': return (ms / 600) & 1 ? 0x20E0FF : 0x60FFFF;
+    case 'l': return 0xC8CCD0;
+    case 'f': return 0x3C8CFF;
+    case 'e': return 0xF0FFFF;
+    case 'g': return 0xC8CCD0;
     default:  return 0;
   }
 }
@@ -89,7 +100,7 @@ void walk(Matrix& m, uint32_t t, uint32_t ms) {
   if (x < W) sprite(m, pose, x, y, ms);
 }
 
-// Fly: the robot crosses with a stripe trail behind it that follows it off.
+// Fly: the face crosses with a stripe trail behind it that follows it off.
 const int kTrail = 26;
 const uint32_t kFlyMs = (uint32_t)(W + SW + kTrail) * 1000 / 12;  // 12 px/s
 void fly(Matrix& m, uint32_t t, uint32_t ms, bool trans) {
@@ -112,7 +123,8 @@ void fly(Matrix& m, uint32_t t, uint32_t ms, bool trans) {
     const int wave = (((tx - (int)(ms / 120)) >> 2) & 1);
     for (int s = 0; s < 6; s++) m.pixel(tx, 1 + s + wave - bob, stripes[s]);
   }
-  sprite(m, kFly, x, 0, ms);
+  // Blink for a moment every couple of seconds.
+  sprite(m, (ms % 2200) < 160 ? kFaceBlink : kFace, x, 0, ms);
 }
 
 uint32_t lastT = 0;
