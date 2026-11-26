@@ -216,6 +216,7 @@ void Commands::state(JsonDocument& out) {
   out["heap_frag"]  = ESP.getHeapFragmentation();
   out["reset_reason"] = Health::resetReason();
   out["wifi_drops"] = Net::reconnects();
+  out["ip_mode"]    = Net::ipMode();
   out["loop_max_ms"] = Health::loopMaxMs();
   out["led_pushes"] = matrix.pushes();
 

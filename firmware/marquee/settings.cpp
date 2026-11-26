@@ -27,6 +27,10 @@ void Settings::defaults() {
   claspEnabled = false;
   copyStr(claspUrl, sizeof claspUrl, "wss://relay.clasp.to");
   copyStr(claspDevice, sizeof claspDevice, "");
+  copyStr(staticIp, sizeof staticIp, "");
+  copyStr(staticGw, sizeof staticGw, "");
+  copyStr(staticMask, sizeof staticMask, "");
+  copyStr(staticDns, sizeof staticDns, "");
 }
 
 bool Settings::load() {
@@ -58,6 +62,10 @@ bool Settings::load() {
   claspEnabled = doc["clasp_enabled"] | claspEnabled;
   copyStr(claspUrl, sizeof claspUrl, doc["clasp_url"] | claspUrl);
   copyStr(claspDevice, sizeof claspDevice, doc["clasp_device"] | claspDevice);
+  copyStr(staticIp, sizeof staticIp, doc["static_ip"] | staticIp);
+  copyStr(staticGw, sizeof staticGw, doc["static_gw"] | staticGw);
+  copyStr(staticMask, sizeof staticMask, doc["static_mask"] | staticMask);
+  copyStr(staticDns, sizeof staticDns, doc["static_dns"] | staticDns);
   return true;
 }
 
@@ -77,6 +85,10 @@ bool Settings::save() {
   doc["clasp_enabled"] = claspEnabled;
   doc["clasp_url"]     = claspUrl;
   doc["clasp_device"]  = claspDevice;
+  doc["static_ip"]     = staticIp;
+  doc["static_gw"]     = staticGw;
+  doc["static_mask"]   = staticMask;
+  doc["static_dns"]    = staticDns;
 
   File f = LittleFS.open(kPath, "w");
   if (!f) return false;

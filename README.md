@@ -168,6 +168,20 @@ not; in those, open `http://marquee.local/`, which is the panel's own simpler
 control page. If `.local` names do not resolve on your device, type the
 panel's IP address into the host field instead.
 
+## Fixed address
+
+By default the panel takes an address from DHCP. To pin it, give it one
+outside your DHCP pool; it takes effect at the next boot:
+
+    curl -d '{"static_ip":"172.22.110.185","static_gw":"172.22.110.1",
+              "static_mask":"255.255.0.0","static_dns":"172.22.110.1",
+              "reboot":true}' http://marquee.local/api/config
+
+After connecting it checks that the network works (a DNS lookup through the
+gateway). If that fails three times in a row it goes back to DHCP until the
+next boot, so a wrong address cannot strand it. `ip_mode` in `/api/state`
+says which it is using. Send `"static_ip":""` to return to DHCP for good.
+
 ## Staying up
 
 The panel is meant to run unattended for months. What keeps it that way:

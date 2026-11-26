@@ -10,5 +10,6 @@ bool apMode();         // setup portal up and no network: serve the setup page
 bool portalOpen();
 bool online();
 uint32_t reconnects(); // times the station dropped since boot
+const char* ipMode();  // "static", "dhcp", or "dhcp (fixed address failed)"
 String ip();
 }  // namespace Net

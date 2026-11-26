@@ -205,6 +205,7 @@ drive the panel.
 | `free_heap`, `max_block`, `heap_frag` | Free memory, the largest piece of it, and fragmentation in percent |
 | `loop_max_ms` | Longest single pass of the main loop in the last minute. A status poll shows up here as about 500. |
 | `wifi_drops` | Times Wi-Fi dropped since boot |
+| `ip_mode` | `static`, `dhcp`, or `dhcp (fixed address failed)` |
 | `led_pushes` | Frames actually sent to the LEDs (unchanged frames are skipped) |
 | `time`, `time_synced`, `tz` | Local time as the clock sees it |
 
@@ -279,6 +280,7 @@ of about 1 KB.
 | `clasp_enabled` | false | Connect to a CLASP relay |
 | `clasp_url` | `wss://relay.clasp.to` | Relay URL, `ws://` or `wss://` |
 | `clasp_device` | `esp` + chip id | Address namespace on the relay |
+| `static_ip`, `static_gw`, `static_mask`, `static_dns` | empty | Fixed address; empty `static_ip` means DHCP. Gateway and DNS default to the network's `.1`, mask to `255.255.0.0`. Applies at the next boot, with a fallback to DHCP if the network does not work on it |
 | `reboot` | - | Pass `true` to restart after saving |
 
 ## Stored animation format

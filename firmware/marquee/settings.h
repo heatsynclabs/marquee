@@ -17,6 +17,12 @@ struct Settings {
   bool     claspEnabled;
   char     claspUrl[96];  // ws:// or wss:// relay URL
   char     claspDevice[32];
+  // Fixed address. Empty ip means DHCP. Gateway and DNS default to .1 of
+  // the address's network when left empty.
+  char     staticIp[16];
+  char     staticGw[16];
+  char     staticMask[16];
+  char     staticDns[16];
 
   void defaults();
   bool load();

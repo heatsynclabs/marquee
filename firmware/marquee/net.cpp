@@ -25,6 +25,47 @@ uint32_t onlineAt = 0;
 uint32_t reconnectCount = 0;
 DNSServer dns;
 
+// Fixed address, with a way back: if the network does not work on it, the
+// panel returns to DHCP until the next boot.
+enum IpMode : uint8_t { Dhcp, Static, StaticFailed } mode = Dhcp;
+uint8_t  checkFails = 0;
+uint32_t nextCheck = 0;
+bool     checked = false;
+
+bool applyStatic() {
+  IPAddress ip, gw, mask, dnsIp;
+  if (!settings.staticIp[0] || !ip.fromString(settings.staticIp)) return false;
+  if (!settings.staticMask[0] || !mask.fromString(settings.staticMask)) mask = IPAddress(255, 255, 0, 0);
+  if (!settings.staticGw[0] || !gw.fromString(settings.staticGw))
+    gw = IPAddress(ip[0], ip[1], mask[2] ? ip[2] : 110, 1);
+  if (!settings.staticDns[0] || !dnsIp.fromString(settings.staticDns)) dnsIp = gw;
+  if (!WiFi.config(ip, gw, mask, dnsIp)) return false;
+  Serial.printf("fixed address %s via %s\n", ip.toString().c_str(), gw.toString().c_str());
+  return true;
+}
+
+void useDhcp() {
+  mode = StaticFailed;
+  Serial.println("fixed address not working; back to DHCP until reboot");
+  WiFi.config(IPAddress(0, 0, 0, 0), IPAddress(0, 0, 0, 0), IPAddress(0, 0, 0, 0));
+  WiFi.disconnect();
+  WiFi.begin(settings.ssid, settings.pass);
+}
+
+// On a fixed address, prove the network works: a DNS lookup goes through the
+// gateway and out. Three misses in a row, about a minute apart, give up.
+void checkStatic(uint32_t now) {
+  if (mode != Static || checked || (int32_t)(now - nextCheck) < 0) return;
+  IPAddress out;
+  if (WiFi.hostByName("pool.ntp.org", out, 3000)) {
+    checked = true;
+    checkFails = 0;
+    return;
+  }
+  if (++checkFails >= 3) useDhcp();
+  else nextCheck = now + 30000;
+}
+
 void openPortal() {
   if (portal) return;
   portal = true;
@@ -74,6 +115,7 @@ void Net::begin() {
     openPortal();
     return;
   }
+  if (applyStatic()) mode = Static;
   Serial.printf("connecting to %s\n", settings.ssid);
   WiFi.begin(settings.ssid, settings.pass);
   lastKick = millis();
@@ -99,6 +141,9 @@ void Net::loop() {
     Serial.printf("online: http://%s.local/ (%s)\n", settings.host,
                   WiFi.localIP().toString().c_str());
     startServices();
+    checked = false;
+    checkFails = 0;
+    nextCheck = now + 5000;
   } else if (!up && wasOnline) {
     wasOnline = false;
     lostAt = now ? now : 1;
@@ -107,6 +152,7 @@ void Net::loop() {
   }
 
   if (up) {
+    checkStatic(now);
     MDNS.update();
     ArduinoOTA.handle();
     // Leave the portal up a minute in case someone is on it, then close it.
@@ -134,4 +180,7 @@ bool Net::apMode() { return portal && !online(); }
 bool Net::portalOpen() { return portal; }
 bool Net::online() { return configured && WiFi.status() == WL_CONNECTED; }
 uint32_t Net::reconnects() { return reconnectCount; }
+const char* Net::ipMode() {
+  return mode == Static ? "static" : mode == StaticFailed ? "dhcp (fixed address failed)" : "dhcp";
+}
 String Net::ip() { return online() ? WiFi.localIP().toString() : WiFi.softAPIP().toString(); }

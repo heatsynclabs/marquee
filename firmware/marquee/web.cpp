@@ -162,6 +162,10 @@ void handleConfigGet() {
   doc["clasp_enabled"] = settings.claspEnabled;
   doc["clasp_url"]     = settings.claspUrl;
   doc["clasp_device"]  = settings.claspDevice;
+  doc["static_ip"]     = settings.staticIp;
+  doc["static_gw"]     = settings.staticGw;
+  doc["static_mask"]   = settings.staticMask;
+  doc["static_dns"]    = settings.staticDns;
   sendJson(200, doc);
 }
 
@@ -180,6 +184,18 @@ void handleConfigPost() {
   str("status_key", settings.statusKey, sizeof settings.statusKey);
   str("clasp_url", settings.claspUrl, sizeof settings.claspUrl);
   str("clasp_device", settings.claspDevice, sizeof settings.claspDevice);
+  // Takes effect at the next boot (send "reboot": true). An empty string
+  // goes back to DHCP. A malformed address is refused rather than saved.
+  for (const char* key : {"static_ip", "static_gw", "static_mask", "static_dns"}) {
+    if (!doc[key].is<const char*>()) continue;
+    const char* v = doc[key].as<const char*>();
+    IPAddress probe;
+    if (v[0] && !probe.fromString(v)) return sendErr(400, String(key) + " is not an IPv4 address");
+  }
+  str("static_ip", settings.staticIp, sizeof settings.staticIp);
+  str("static_gw", settings.staticGw, sizeof settings.staticGw);
+  str("static_mask", settings.staticMask, sizeof settings.staticMask);
+  str("static_dns", settings.staticDns, sizeof settings.staticDns);
   if (doc["brightness"].is<int>()) settings.brightness = doc["brightness"].as<int>();
   if (doc["power_ma"].is<int>()) settings.powerMa = doc["power_ma"].as<int>();
   if (doc["clasp_enabled"].is<bool>()) settings.claspEnabled = doc["clasp_enabled"];
