@@ -60,6 +60,35 @@ static uint8_t glyphColumn(char ch, int col) {
   return pgm_read_byte(&FONT5X7[(ch - 32) * FONT_W + col]);
 }
 
+// "{bot}" in any text draws a small robot face, the height of a letter. Each
+// one in a string takes the next color, so a row of them never matches.
+static const char kBotToken[] = "{bot}";
+static const int kBotTokenLen = 5;
+static const int kBotW = 7;
+// f face, w white (eyes, smile, antennae), k dark pupil
+static const char* const kBot[FONT_H] = {
+    "..w.w..", ".fffff.", "fwwfwwf", "fwkfwkf", "fffffff", "ffwwwff", ".fffff.",
+};
+// Picked by how they look through the panel's gamma: six hues that stay
+// apart on the LEDs (blue, violet, green, aqua, pink, lime).
+static const uint32_t kBotColors[] = {0x4080FF, 0xC050FF, 0x30FF60, 0x00FFC8, 0xFF40C0, 0xB0FF20};
+static const int kBotColorCount = sizeof kBotColors / sizeof kBotColors[0];
+static uint8_t botSeed = 0;
+
+void Matrix::shuffleBots() { botSeed = (uint8_t)(RANDOM_REG32 % kBotColorCount); }
+
+static bool isBot(const char* p) { return !strncmp(p, kBotToken, kBotTokenLen); }
+
+static void drawBot(Matrix& m, int x, int y, int n) {
+  const uint32_t face = kBotColors[(botSeed + n) % kBotColorCount];
+  for (int r = 0; r < FONT_H; r++)
+    for (int c = 0; c < kBotW; c++) {
+      const char ch = kBot[r][c];
+      if (ch == '.' || ch == 'k') continue;
+      m.pixel(x + c, y + r, ch == 'f' ? face : 0xF0FFFF);
+    }
+}
+
 // Proportional spacing: a glyph takes only the columns it lights, a space
 // is two, and one blank column separates letters. The font is monospaced, so
 // without this a space or a comma leaves a six-pixel hole. mono keeps every
@@ -79,6 +108,11 @@ static void glyphSpan(char ch, bool mono, int& first, int& width) {
 int Matrix::textWidth(const char* s, bool mono) {
   int w = 0;
   for (const char* p = s; *p; p++) {
+    if (isBot(p)) {
+      w += kBotW + 1;
+      p += kBotTokenLen - 1;
+      continue;
+    }
     int first, width;
     glyphSpan(*p, mono, first, width);
     w += width + 1;
@@ -90,7 +124,15 @@ int Matrix::textWidth(const char* s, bool mono) {
 template <typename ColorAt>
 static int drawText(Matrix& m, int x, int y, const char* s, bool mono, ColorAt colorAt) {
   const int x0 = x;
+  int bots = 0;
   for (const char* p = s; *p; p++) {
+    if (isBot(p)) {
+      if (x + kBotW > 0 && x < Matrix::W) drawBot(m, x, y, bots);
+      bots++;
+      x += kBotW + 1;
+      p += kBotTokenLen - 1;
+      continue;
+    }
     int first, width;
     glyphSpan(*p, mono, first, width);
     if (x + width > 0 && x < Matrix::W) {

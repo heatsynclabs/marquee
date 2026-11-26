@@ -32,7 +32,8 @@ const uint32_t kCyan     = 0x20E0FF;
 
 // Each appearance picks a face color and a gear color, so it looks a little
 // different every time it comes around. All cool tones on the face.
-const uint32_t kFaceColors[] = {0x3C8CFF, 0x9060FF, 0x00C8A0, 0x30D050, 0xE040E0, 0x00B0E0};
+// Same six hues as the {bot} faces in text, chosen to stay apart on the LEDs.
+const uint32_t kFaceColors[] = {0x4080FF, 0xC050FF, 0x30FF60, 0x00FFC8, 0xFF40C0, 0xB0FF20};
 const uint32_t kGearColors[] = {0xC8D0D8, 0xFFC830, 0x80FFC0, 0xC0A0FF, 0xA0E8FF};
 uint32_t faceColor = kFaceColors[0];
 uint32_t gearTeeth = kGearColors[0];
@@ -43,9 +44,18 @@ uint32_t dim(uint32_t c, uint8_t keep) {
          ((c & 0xFF) * keep >> 8);
 }
 
-void pickColors(uint32_t n) {
-  faceColor = kFaceColors[n % (sizeof kFaceColors / sizeof kFaceColors[0])];
-  gearTeeth = kGearColors[(n * 3 + 1) % (sizeof kGearColors / sizeof kGearColors[0])];
+// A random face and gear color each appearance, never the same face color
+// twice in a row (counting from boot would start on the same one after every
+// restart).
+void pickColors() {
+  const uint32_t nf = sizeof kFaceColors / sizeof kFaceColors[0];
+  const uint32_t ng = sizeof kGearColors / sizeof kGearColors[0];
+  static uint32_t lastFace = nf;
+  uint32_t f = RANDOM_REG32 % nf;
+  if (f == lastFace) f = (f + 1 + RANDOM_REG32 % (nf - 1)) % nf;
+  lastFace = f;
+  faceColor = kFaceColors[f];
+  gearTeeth = kGearColors[RANDOM_REG32 % ng];
   gearBody  = dim(gearTeeth, 180);
 }
 
@@ -247,7 +257,7 @@ void Robot::render(Matrix& m, uint32_t elapsed, uint32_t ms) {
   if (elapsed < lastT || !started) {
     if (started) appearances++;
     started = true;
-    pickColors(appearances);
+    pickColors();
   }
   lastT = elapsed;
 

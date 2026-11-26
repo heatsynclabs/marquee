@@ -25,6 +25,8 @@ class Matrix {
   // Same, but each column takes its hue from x, giving a rainbow fill.
   int textRainbow(int x, int y, const char* s, uint16_t hue);
   static int textWidth(const char* s, bool mono = false);
+  // New starting color for the {bot} faces; called as each item starts.
+  static void shuffleBots();
 
   // Copies raw RGB bytes into the buffer starting at a pixel offset.
   void blit(const uint8_t* rgb, size_t bytes, size_t firstPixel = 0);

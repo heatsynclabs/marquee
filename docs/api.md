@@ -122,13 +122,15 @@ While `open` is true, the `open` item appears every `status_every` turns of the
 rotation, so it keeps coming back around between everything else. By default it
 holds OPEN still, then scrolls the sentence once:
 
-    OPEN  (still, 2 s)  ->  OPEN HOURS, WE'RE OPEN, COME IN UNTIL 9 PM  (scrolls)
+    OPEN  (still, 2 s)  ->  OPEN HOURS {bot} WE'RE OPEN {bot} COME IN  (scrolls)
 
     clock -> (open frames) -> HEATSYNC LABS -> (open frames) -> robot -> ...
 
-`UNTIL 9 PM` comes from `{until}` and only appears when the feed also carries
-a closing time as `"open_until": "21:00"` (local, 24 hour). Without it, or once
-that time has passed, it is dropped along with the separator before it.
+`{bot}`, in any text or frame, draws a small robot face; each one in a string
+takes the next of six colors, starting from a random one. `{until}` is still
+understood: it becomes `UNTIL 9 PM` when the status feed carries
+`"open_until": "21:00"` and is dropped otherwise. The lab's default leaves it
+out, since a host may keep the lab open later than scheduled.
 
 While it is false, the rotation runs normally and nothing extra is shown.
 

@@ -116,6 +116,7 @@ void Player::start(const Item& it, bool asIdle) {
   if (file_) file_.close();
   cur_ = it;
   sanitize(cur_);
+  Matrix::shuffleBots();
   idle_ = asIdle;
   start_ = millis();
   lastFrame_ = -1;

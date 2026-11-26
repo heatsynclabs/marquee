@@ -263,7 +263,7 @@ def main():
     s.add_argument("--ms", type=int, help="how long each entry stays up")
     s.add_argument("--open", metavar="FRAMES",
                    help="frames to show while the status poll is true, split with |, "
-                        "e.g. \"OPEN|OPEN HOURS, COME IN {until}\"; empty string turns it off")
+                        "e.g. \"OPEN|OPEN HOURS {bot} COME IN\"; empty string turns it off")
     s.add_argument("--open-color", default="#33ff66")
     s.set_defaults(func=cmd_rotate)
 

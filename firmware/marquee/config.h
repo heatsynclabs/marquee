@@ -38,8 +38,9 @@
 #define DEFAULT_STATUS_EVERY 2     // show it every Nth idle entry while true
 #define STATUS_TLS_BUFFER    4096  // BearSSL receive buffer for the poll
 // OPEN held still (it fits), then the whole sentence in one smooth scroll.
-// {until} becomes "UNTIL 9 PM" when the feed has "open_until", else is dropped.
-#define DEFAULT_STATUS_CARDS "OPEN|OPEN HOURS, WE'RE OPEN, COME IN {until}"
+// {bot} draws a little robot face between the phrases, a new color each time.
+// No closing time: a host may keep the lab open later than scheduled.
+#define DEFAULT_STATUS_CARDS "OPEN|OPEN HOURS {bot} WE'RE OPEN {bot} COME IN"
 #define DEFAULT_STATUS_COLOR "#33ff66"
 
 // --- CLASP relay ------------------------------------------------------------
@@ -79,4 +80,4 @@
 // text can go while every frame still moves by exactly one column.
 #define DEFAULT_SPEED   30
 
-#define FW_VERSION "1.4.1"
+#define FW_VERSION "1.5.1"

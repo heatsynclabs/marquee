@@ -399,13 +399,13 @@ footer { border-top:2px solid var(--g-line-hi); }
     </div>
     <div class="field" style="margin-top:var(--space-3)">
       <label for="rot-open">Open Hours frames</label>
-      <input type="text" id="rot-open" value="OPEN|OPEN HOURS, WE'RE OPEN, COME IN {until}" spellcheck="false">
+      <input type="text" id="rot-open" value="OPEN|OPEN HOURS {bot} WE'RE OPEN {bot} COME IN" spellcheck="false">
     </div>
     <div class="row">
       <div class="fit"><button class="btn" data-variant="primary" id="rot-send" type="button">Push rotation</button></div>
       <div class="fit"><button class="btn" id="rot-load" type="button">Load from panel</button></div>
     </div>
-    <p class="hint">Six entries maximum, each taking a turn. While the doors read open, the Open Hours frames are mixed in every other turn. Frames are split with |: one that fits (five letters) holds still for two seconds, a longer one scrolls through once. {until} becomes "UNTIL 9 PM" when the status feed gives a closing time and is dropped when it does not. Leave it empty to turn it off.</p>
+    <p class="hint">Six entries maximum, each taking a turn. While the doors read open, the Open Hours frames are mixed in every other turn. Frames are split with |: one that fits (five letters) holds still for two seconds, a longer one scrolls through once. {bot} draws a small robot face, a new color each time. Leave it empty to turn it off.</p>
   </section>
 
   <section class="card">
