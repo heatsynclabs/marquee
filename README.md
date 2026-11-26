@@ -107,16 +107,19 @@ watches is true, mixes an extra entry into the rotation every other turn:
 
     clock -> OPEN HOURS ... -> HEATSYNC LABS -> OPEN HOURS ... -> robot -> ...
 
-The open entry is a run of still frames, one word each so nothing scrolls:
-OPEN, HOURS, WE'RE, OPEN, COME, IN. If the feed also says when the lab closes
-(`"open_until": "21:00"`), two more frames follow: UNTIL, 9 PM.
+The open entry holds OPEN still for two seconds (it fits the panel), then
+scrolls the whole sentence once: OPEN HOURS - WE'RE OPEN - COME IN, followed by
+UNTIL 9 PM when the feed also says when the lab closes
+(`"open_until": "21:00"`). The panel is 30 pixels wide, five letters, so a
+short word can stand still and anything longer reads best as one smooth
+scroll.
 
 Out of the box it reads `https://members.heatsynclabs.org/space_api.json` and
 watches `open`, the same SpaceAPI document the HeatSync Labs website uses for
 its own door indicator. When the lab is closed, nothing extra is shown.
 
     tools/marquee.py status                     what it last saw
-    tools/marquee.py rotate --open "OPEN|HOURS|COME|IN|{until}"   change the frames
+    tools/marquee.py rotate --open "OPEN|COME IN - {until}"       change the frames
     tools/marquee.py rotate --open ""                              turn it off
 
 Point it somewhere else with `status_url` and `status_key`; any endpoint

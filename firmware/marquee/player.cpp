@@ -196,40 +196,50 @@ bool Player::renderStored(Matrix& m, uint32_t elapsed) {
   return loop >= reps();
 }
 
-// Splits "OPEN|HOURS|{until}" into cards. {until} becomes "UNTIL" and the
-// closing time when the status feed gave one, and disappears when it did not.
+// Splits "OPEN|OPEN HOURS - COME IN - {until}" into cards. {until} becomes
+// "UNTIL 9 PM" when the status feed gave a closing time and disappears when it
+// did not, taking any separator left dangling at the end with it.
 void Player::expandCards() {
   cardCount_ = 0;
   size_t w = 0;
-  auto add = [&](const char* s, size_t n) {
-    if (!n || cardCount_ >= kMaxCards || w + n + 1 > sizeof cardBuf_) return;
-    cardOff_[cardCount_++] = w;
-    memcpy(cardBuf_ + w, s, n);
-    w += n;
-    cardBuf_[w++] = 0;
-  };
+  char until[20];
+  const bool haveUntil = Status::untilText(until, sizeof until);
+
   const char* p = cur_.arg;
-  while (*p) {
+  while (*p && cardCount_ < kMaxCards) {
     const char* bar = strchr(p, '|');
     size_t n = bar ? (size_t)(bar - p) : strlen(p);
-    if (n == 7 && !memcmp(p, "{until}", 7)) {
-      char t[2][8];
-      int k = Status::untilCards(t[0], t[1], sizeof t[0]);
-      if (k > 0) {
-        add("UNTIL", 5);
-        for (int i = 0; i < k; i++) add(t[i], strlen(t[i]));
+
+    char card[sizeof cur_.arg];
+    size_t c = 0;
+    for (size_t i = 0; i < n && c + 1 < sizeof card;) {
+      if (n - i >= 7 && !memcmp(p + i, "{until}", 7)) {
+        for (const char* u = haveUntil ? until : ""; *u && c + 1 < sizeof card; u++) card[c++] = *u;
+        i += 7;
+      } else {
+        card[c++] = p[i++];
       }
-    } else {
-      add(p, n);
+    }
+    while (c && (card[c - 1] == ' ' || card[c - 1] == '-' || card[c - 1] == ',')) c--;
+    size_t s0 = 0;
+    while (s0 < c && card[s0] == ' ') s0++;
+
+    const size_t len = c - s0;
+    if (len && w + len + 1 <= sizeof cardBuf_) {
+      cardOff_[cardCount_++] = w;
+      memcpy(cardBuf_ + w, card + s0, len);
+      w += len;
+      cardBuf_[w++] = 0;
     }
     if (!bar) break;
     p = bar + 1;
   }
 }
 
-// A card that fits holds still; one that is wider than the panel scrolls once.
+// A card that fits holds still long enough to read; one wider than the panel
+// scrolls through once, smoothly, at the item's speed.
 uint32_t Player::cardMs(uint8_t i) const {
-  const uint32_t hold = cur_.hold ? cur_.hold : 1100;
+  const uint32_t hold = cur_.hold ? cur_.hold : 2000;
   const int w = Matrix::textWidth(cardBuf_ + cardOff_[i]);
   if (w <= Matrix::W) return hold;
   return (uint32_t)(Matrix::W + w) * 1000 / cur_.speed;

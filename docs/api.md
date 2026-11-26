@@ -24,13 +24,13 @@ internet.
 | `text` (or `say`) | string | Message to display, up to 127 characters. |
 | `anim` | string | Built-in effect name. |
 | `play` | string | Stored animation name. |
-| `cards` | string or array | Still frames shown one after another, e.g. `"OPEN\|HOURS"` or `["OPEN","HOURS"]`. Five characters fit; a longer word scrolls once. `{until}` becomes UNTIL and the closing time, see [Status polling](#status-polling). |
+| `cards` | string or array | Frames shown one after another, e.g. `"OPEN\|COME IN"` or `["OPEN","COME IN"]`. A frame that fits (five characters) holds still; a longer one scrolls through once. `{until}` becomes `UNTIL 9 PM`, see [Status polling](#status-polling). |
 | `color` | string or number | See [Colors](#colors). |
 | `rainbow` | bool | Color the text by column instead of using `color`. |
 | `speed` | number | Scroll speed in pixels per second, 1 to 200. Default 30, one pixel per frame; above that the text starts to skip columns. |
 | `repeat` | number | How many times to play. `-1` repeats forever. Default 1. |
 | `scroll` | bool | `false` centers the text instead of scrolling. Default true. |
-| `hold` | number | Milliseconds to hold before moving on. For `cards`, how long each frame stays up (default 1100). |
+| `hold` | number | Milliseconds to hold before moving on. For `cards`, how long a still frame stays up (default 2000). |
 | `fps` | number | Override a stored animation's frame rate, up to 60. |
 | `now` | bool | Drop the queue and play immediately. Default false, which queues. |
 | `clear` | bool | Empty the queue and return to the idle rotation. |
@@ -117,15 +117,15 @@ is open, using the same SpaceAPI document the lab's own website reads.
 
 While `open` is true, the `open` item appears every `status_every` turns of the
 rotation, so it keeps coming back around between everything else. By default it
-is a run of still frames that each fit the panel, so nothing has to scroll:
+holds OPEN still, then scrolls the sentence once:
 
-    OPEN | HOURS | WE'RE | OPEN | COME | IN | UNTIL | 9 PM
+    OPEN  (still, 2 s)  ->  OPEN HOURS - WE'RE OPEN - COME IN - UNTIL 9 PM  (scrolls)
 
     clock -> (open frames) -> HEATSYNC LABS -> (open frames) -> robot -> ...
 
-The last two frames come from `{until}` and only appear when the feed also
-carries a closing time as `"open_until": "21:00"` (local, 24 hour). Without it
-they are skipped, and once that time has passed they drop out too.
+`UNTIL 9 PM` comes from `{until}` and only appears when the feed also carries
+a closing time as `"open_until": "21:00"` (local, 24 hour). Without it, or once
+that time has passed, it is dropped along with the separator before it.
 
 While it is false, the rotation runs normally and nothing extra is shown.
 

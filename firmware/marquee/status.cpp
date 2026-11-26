@@ -265,24 +265,22 @@ const char* Status::lastError() { return error; }
 
 const char* Status::untilRaw() { return until; }
 
-int Status::untilCards(char* a, char* b, size_t n) {
-  if (!on() || strlen(until) != 5 || until[2] != ':') return 0;
+bool Status::untilText(char* out, size_t n) {
+  if (!n) return false;
+  out[0] = 0;
+  if (!on() || strlen(until) != 5 || until[2] != ':') return false;
   int h = atoi(until), m = atoi(until + 3);
-  if (h < 0 || h > 23 || m < 0 || m > 59) return 0;
+  if (h < 0 || h > 23 || m < 0 || m > 59) return false;
 
   time_t now = time(nullptr);
   if (now > 1700000000) {
     struct tm tm;
     localtime_r(&now, &tm);
-    if (tm.tm_hour * 60 + tm.tm_min >= h * 60 + m) return 0;  // already past
+    if (tm.tm_hour * 60 + tm.tm_min >= h * 60 + m) return false;  // already past
   }
   const char* ap = h >= 12 ? "PM" : "AM";
   int h12 = h % 12 ? h % 12 : 12;
-  if (m == 0) {
-    snprintf(a, n, "%d %s", h12, ap);
-    return 1;
-  }
-  snprintf(a, n, "%d:%02d", h12, m);
-  snprintf(b, n, "%s", ap);
-  return 2;
+  if (m == 0) snprintf(out, n, "UNTIL %d %s", h12, ap);
+  else snprintf(out, n, "UNTIL %d:%02d %s", h12, m, ap);
+  return true;
 }

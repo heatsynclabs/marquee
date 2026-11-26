@@ -37,9 +37,9 @@
 #define DEFAULT_STATUS_POLL  300   // seconds between polls
 #define DEFAULT_STATUS_EVERY 2     // show it every Nth idle entry while true
 #define STATUS_TLS_BUFFER    4096  // BearSSL receive buffer for the poll
-// Still frames, one word each, so nothing has to scroll. {until} becomes
-// UNTIL + the closing time when the feed has "open_until", else is dropped.
-#define DEFAULT_STATUS_CARDS "OPEN|HOURS|WE'RE|OPEN|COME|IN|{until}"
+// OPEN held still (it fits), then the whole sentence in one smooth scroll.
+// {until} becomes "UNTIL 9 PM" when the feed has "open_until", else is dropped.
+#define DEFAULT_STATUS_CARDS "OPEN|OPEN HOURS - WE'RE OPEN - COME IN - {until}"
 #define DEFAULT_STATUS_COLOR "#33ff66"
 
 // --- CLASP relay ------------------------------------------------------------
@@ -79,4 +79,4 @@
 // text can go while every frame still moves by exactly one column.
 #define DEFAULT_SPEED   30
 
-#define FW_VERSION "1.1.3"
+#define FW_VERSION "1.2.0"

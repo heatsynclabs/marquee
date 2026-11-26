@@ -20,9 +20,9 @@ uint32_t lastPollS();   // seconds since the last successful poll
 uint32_t lastPollMs();  // how long that poll took
 const char* lastError();
 
-// Closing time from the feed's optional "open_until" ("HH:MM", local), as one
-// or two cards that fit the panel: "9 PM", or "9:30" + "PM". Returns how many
-// were written, 0 when there is no closing time or it has passed.
-int untilCards(char* a, char* b, size_t n);
+// Closing time from the feed's optional "open_until" ("HH:MM", local) as
+// "UNTIL 9 PM" or "UNTIL 9:30 PM". False, with out empty, when there is no
+// closing time or it has passed.
+bool untilText(char* out, size_t n);
 const char* untilRaw();
 }  // namespace Status
