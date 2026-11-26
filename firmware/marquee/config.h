@@ -79,4 +79,4 @@
 // text can go while every frame still moves by exactly one column.
 #define DEFAULT_SPEED   30
 
-#define FW_VERSION "1.1.2"
+#define FW_VERSION "1.1.3"
